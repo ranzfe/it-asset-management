@@ -314,6 +314,3 @@ with tab6:
         st.dataframe(df_logs, use_container_width=True, hide_index=True)
     else:
         st.info("Belum ada riwayat aktivitas.")
-
-# --- DIPANGGIL DI PALING BAWAH AGAR FLOATING STYLING BERJALAN SEMPURNA ---
-render_ai_assistant()
