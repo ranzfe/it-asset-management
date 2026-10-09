@@ -5,9 +5,9 @@ from datetime import datetime
 DB_FILE = "database_asset.csv"
 LOG_FILE = "history_log.csv"
 
-# Kolom Baru: 'Ket Wilayah' Dihapus, Digantikan oleh 'Link Foto Asset'
+# Kolom Baru: Penambahan 'Purchase Date'
 COLUMNS = [
-    "SN", "Tipe", "Model", "Status Beli", "Asal PO",
+    "SN", "Tipe", "Model", "Purchase Date", "Status Beli", "Asal PO",
     "Status", "NIK", "User", "Kd Site", "Site", "No Mobil",
     "SIM Card", "Imei", "Link Foto Asset", "Keterangan"
 ]
@@ -18,7 +18,7 @@ STATUS_OPTIONS = ["Pakai", "Rusak", "Hilang", "Jual", "Cadangan", "Cek"]
 def load_data():
     if os.path.exists(DB_FILE):
         df = pd.read_csv(DB_FILE, dtype=str)
-        # Migrasi: Hapus kolom lama jika ada
+        # Hapus kolom lama Ket Wilayah jika masih ada di CSV
         if "Ket Wilayah" in df.columns:
             df = df.drop(columns=["Ket Wilayah"])
         for col in COLUMNS:
