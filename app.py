@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+import re
 from datetime import datetime
 from database import (
     load_data, load_logs, save_data, add_log, 
@@ -33,20 +34,20 @@ col5.metric("Jual", jual_count)
 st.markdown("---")
 
 # --- TAB MENU UTAMA ---
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📋 Daftar, Sort & Filter Aset", 
     "📊 Analytics & Grafik",
     "✏️ Edit & Hapus Aset",
     "📤 Upload Excel/CSV", 
     "➕ Tambah Manual",
-    "📜 Log History"
+    "📜 Log History",
+    "📱 Plotting Tagihan Simcard"
 ])
 
 # TAB 1: LIHAT, SORT, & FILTER DATA
 with tab1:
     st.subheader("Daftar Aset Terdaftar")
     
-    # Deteksi Duplikat
     if not df_asset.empty and "SN" in df_asset.columns:
         sn_series = df_asset["SN"].astype(str).str.strip().str.upper()
         duplikat_mask = sn_series.duplicated(keep='first') & (sn_series != "")
@@ -61,7 +62,6 @@ with tab1:
                 st.success(f"Berhasil membersihkan {total_duplikat} data duplikat!")
                 st.rerun()
 
-    # --- PANEL FILTER & SORTING ---
     with st.expander("🎛️ Panel Filter & Sorting Data", expanded=True):
         col_f1, col_f2, col_f3, col_f4, col_s1, col_s2 = st.columns([2, 1.2, 1.2, 1.2, 1.2, 1])
         
@@ -82,7 +82,6 @@ with tab1:
         with col_s2:
             sort_order = st.radio("Urutan:", ["A-Z (Asc)", "Z-A (Desc)"])
 
-    # --- MEMPROSES FILTER & SORT ---
     df_filtered = df_asset.copy()
     
     if search_term:
@@ -104,7 +103,6 @@ with tab1:
 
     st.caption(f"Menampilkan **{len(df_filtered)}** dari total **{len(df_asset)}** aset.")
     
-    # Menampilkan Dataframe Utama dengan Link Buka Foto
     st.dataframe(
         df_filtered, 
         use_container_width=True, 
@@ -122,7 +120,6 @@ with tab1:
         }
     )
 
-    # --- TOMBOL EXPORT (CSV & EXCEL BERDEKATAN) ---
     if not df_filtered.empty:
         col_ex1, col_ex2, col_ex_empty = st.columns([0.2, 0.25, 1])
         with col_ex1:
@@ -335,6 +332,128 @@ with tab6:
         st.dataframe(df_logs, use_container_width=True, hide_index=True)
     else:
         st.info("Belum ada riwayat aktivitas.")
+
+# TAB 7: PLOTTING TAGIHAN TELKOM & HISTORIS (SMART MATCHING)
+with tab7:
+    st.subheader("📱 Auto-Plotting Tagihan Telkom & Matching Data Akhir")
+    st.caption("Mencocokkan file tagihan Telkom dengan Database ITAM dan Data Acuan Historis bulan sebelumnya secara otomatis.")
+    
+    col_u1, col_u2 = st.columns(2)
+    with col_u1:
+        file_telkom = st.file_uploader("1. Upload File Tagihan Telkom (MSISDN, TAGIHAN, dll)", type=["xlsx", "csv"], key="u_telkom")
+    with col_u2:
+        file_historis = st.file_uploader("2. Upload Data Acuan/Historis Bulan Lalu (Opsional)", type=["xlsx", "csv"], key="u_historis")
+        
+    if file_telkom is not None:
+        try:
+            df_tel = pd.read_csv(file_telkom, dtype=str) if file_telkom.name.endswith('.csv') else pd.read_excel(file_telkom, dtype=str)
+            df_hist = pd.DataFrame()
+            if file_historis is not None:
+                df_hist = pd.read_csv(file_historis, dtype=str) if file_historis.name.endswith('.csv') else pd.read_excel(file_historis, dtype=str)
+
+            st.markdown("---")
+            st.info("✅ Otomatis mendeteksi kolom **MSISDN**, **TAGIHAN**, **NAMA_PELANGGAN**, & **AREA** dari file Telkom.")
+            
+            if st.button("🚀 Jalankan Smart Matching & Pull Data", type="primary"):
+                # Pre-processing Data DB ITAM
+                df_db_clean = df_asset.copy().fillna("")
+                df_db_clean["SIM_clean"] = df_db_clean["SIM Card"].astype(str).str.replace(r'\D', '', regex=True)
+                
+                # Pre-processing Data Historis jika ada
+                if not df_hist.empty:
+                    df_hist = df_hist.fillna("")
+                    # Cari kolom nomor sim di file historis
+                    hist_sim_col = [c for c in df_hist.columns if "SIM" in c.upper() or "MSISDN" in c.upper() or "NOMOR" in c.upper()]
+                    if hist_sim_col:
+                        df_hist["SIM_clean"] = df_hist[hist_sim_col[0]].astype(str).str.replace(r'\D', '', regex=True)
+                    else:
+                        df_hist["SIM_clean"] = ""
+
+                results = []
+                for idx, row in df_tel.iterrows():
+                    raw_msisdn = str(row.get("MSISDN", "")).strip()
+                    sim_clean = re.sub(r'\D', '', raw_msisdn)
+                    tagihan_val = str(row.get("TAGIHAN", "0")).strip()
+                    nama_pelanggan = str(row.get("NAMA_PELANGGAN", "")).strip()
+                    area_telkom = str(row.get("AREA", "")).strip()
+                    
+                    depo_val = user_val = mobil_val = sn_val = "-"
+                    ket_val = ""
+                    
+                    # 1. COCOKAN KE DATABASE ITAM
+                    match_db = pd.DataFrame()
+                    if sim_clean != "":
+                        match_db = df_db_clean[df_db_clean["SIM_clean"] == sim_clean]
+                    
+                    if not match_db.empty:
+                        target = match_db.iloc[0]
+                        depo_val = target["Site"]
+                        user_val = target["User"]
+                        mobil_val = target["No Mobil"]
+                        sn_val = target["SN"]
+                        ket_val = f"MATCH ITAM (Status: {target['Status']})"
+                    else:
+                        # 2. COCOKAN KE DATA HISTORIS BULAN LALU
+                        match_hist = pd.DataFrame()
+                        if not df_hist.empty and sim_clean != "" and "SIM_clean" in df_hist.columns:
+                            match_hist = df_hist[df_hist["SIM_clean"] == sim_clean]
+                            
+                        if not match_hist.empty:
+                            target_h = match_hist.iloc[0]
+                            depo_val = target_h.get("DEPO", area_telkom)
+                            user_val = target_h.get("NAMA USER", nama_pelanggan)
+                            mobil_val = target_h.get("KODE DA/NO MOBIL", "-")
+                            sn_val = target_h.get("SN DEVICE", "-")
+                            ket_val = "MATCH HISTORIS BULAN LALU"
+                        else:
+                            # 3. JIKA SAMA SEKALI TIDAK DITEMUKAN
+                            depo_val = area_telkom if area_telkom else "-"
+                            user_val = nama_pelanggan if nama_pelanggan else "-"
+                            mobil_val = "-"
+                            sn_val = "-"
+                            ket_val = "⚠️ NOMOR BARU / BELUM TERDAFTAR"
+
+                    results.append({
+                        "DEPO": depo_val,
+                        "NAMA USER": user_val,
+                        "KODE DA/NO MOBIL": mobil_val,
+                        "NOMOR SIM": raw_msisdn,
+                        "TAGIHAN": tagihan_val,
+                        "SN DEVICE": sn_val,
+                        "KETERANGAN": ket_val
+                    })
+
+                st.session_state["plotting_result"] = pd.DataFrame(results)
+                st.success("🎉 **Matching Selesai!**")
+
+            # TABEL INTERAKTIF HASIL PLOTTING (BISA DILENGKAPI / DIEDIT MANUAL)
+            if "plotting_result" in st.session_state:
+                st.markdown("---")
+                st.markdown("##### ✏️ Hasil Plotting (Dapat Dilengkapi / Diisi Manual Langsung di Tabel):")
+                st.caption("Gunakan tabel di bawah ini untuk mengisi data USER / KODE DA / DEPO yang bertanda `⚠️ NOMOR BARU / BELUM TERDAFTAR` sebelum di-download.")
+                
+                edited_plotting = st.data_editor(
+                    st.session_state["plotting_result"],
+                    use_container_width=True,
+                    hide_index=True,
+                    num_rows="dynamic"
+                )
+                
+                # DOWNLOAD HASIL FINAL
+                output_plot = io.BytesIO()
+                with pd.ExcelWriter(output_plot, engine='openpyxl') as writer:
+                    edited_plotting.to_excel(writer, index=False, sheet_name='Hasil_Plotting')
+                excel_plot_data = output_plot.getvalue()
+                
+                st.download_button(
+                    "📊 Export Hasil Final ke Excel (.xlsx)", 
+                    excel_plot_data, 
+                    "hasil_plotting_tagihan_simcard.xlsx", 
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary"
+                )
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat membaca file: {e}")
 
 # RENDER AI ASSISTANT SIDEBAR
 render_ai_assistant()
