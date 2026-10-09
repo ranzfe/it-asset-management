@@ -5,6 +5,7 @@ from database import (
     load_data, load_logs, save_data, add_log, 
     COLUMNS, STATUS_OPTIONS
 )
+from ai_assistant import render_ai_assistant
 
 # Konfigurasi Halaman Web
 st.set_page_config(page_title="IT Asset Management", page_icon="💻", layout="wide")
@@ -315,5 +316,3 @@ with tab6:
     else:
         st.info("Belum ada riwayat aktivitas.")
 
-# --- RENDER AI ASSISTANT FLOATING BUTTON (DI PALING BAWAH) ---
-render_ai_assistant()
