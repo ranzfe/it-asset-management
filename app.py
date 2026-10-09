@@ -333,16 +333,16 @@ with tab6:
     else:
         st.info("Belum ada riwayat aktivitas.")
 
-# TAB 7: PLOTTING TAGIHAN SIMCARD (SERBA OTOMATIS & BEBAS ERROR)
+# TAB 7: PLOTTING TAGIHAN SIMCARD (SPESIFIK 3-WAY MATCHING)
 with tab7:
     st.subheader("📱 Auto-Plotting Tagihan SIM Card")
-    st.caption("Unggah 3 file untuk otomatis menarik data, mencocokkan SN Device, serta mendeteksi user yang sudah non-aktif.")
+    st.caption("Pencocokan presisi antara Tagihan Telkom, Data User Terbaru Bulan Ini, & Data Historis.")
     
     col_u1, col_u2, col_u3 = st.columns(3)
     with col_u1:
-        file_telkom = st.file_uploader("1. File Tagihan Telkom (.xlsx/.csv)", type=["xlsx", "csv"], key="u3_telkom")
+        file_telkom = st.file_uploader("1. File Tagihan Telkom (MSISDN & TAGIHAN)", type=["xlsx", "csv"], key="u3_telkom")
     with col_u2:
-        file_active_users = st.file_uploader("2. File User/DA Aktif Bulan Ini (.xlsx/.csv)", type=["xlsx", "csv"], key="u3_users")
+        file_active_users = st.file_uploader("2. File Update User Terbaru Bulan Ini", type=["xlsx", "csv"], key="u3_users")
     with col_u3:
         file_historis = st.file_uploader("3. File Historis Bulan Lalu (Opsional)", type=["xlsx", "csv"], key="u3_historis")
         
@@ -362,11 +362,11 @@ with tab7:
                 df_hist = df_hist.fillna("").astype(str)
 
             if st.button("🚀 Jalankan Auto-Plotting Data", type="primary"):
-                # Pre-processing Database ITAM
+                # Clean DB ITAM
                 df_db_clean = df_asset.copy().fillna("").astype(str)
                 df_db_clean["SIM_clean"] = df_db_clean["SIM Card"].apply(lambda x: re.sub(r'\D', '', str(x)))
 
-                # Pre-processing File Historis (Mencari Kolom SIM secara fleksibel)
+                # Clean Historis
                 if not df_hist.empty:
                     sim_col_hist = [c for c in df_hist.columns if any(k in c.upper() for k in ["SIM", "MSISDN", "NOMOR"])]
                     if sim_col_hist:
@@ -374,70 +374,76 @@ with tab7:
                     else:
                         df_hist["SIM_clean"] = ""
 
-                # Pre-processing File User Aktif Bulan Ini
-                active_users_list = []
-                user_col_act = [c for c in df_users.columns if any(k in c.upper() for k in ["USER", "NAMA", "SALES"])]
-                if user_col_act:
-                    active_users_list = [u.strip().upper() for u in df_users[user_col_act[0]].tolist() if u.strip() != ""]
+                # Clean File User Aktif Bulan Ini
+                if not df_users.empty:
+                    sim_col_usr = [c for c in df_users.columns if any(k in c.upper() for k in ["SIM", "MSISDN", "NOMOR"])]
+                    if sim_col_usr:
+                        df_users["SIM_clean"] = df_users[sim_col_usr[0]].apply(lambda x: re.sub(r'\D', '', str(x)))
+                    else:
+                        df_users["SIM_clean"] = ""
 
                 results = []
                 for idx, row in df_tel.iterrows():
-                    # Ambil Kolom Telkom dengan Fallback
+                    # 1. TARIK DATA TELKOM
                     msisdn_col = [c for c in df_tel.columns if "MSISDN" in c.upper() or "SIM" in c.upper() or "NO" in c.upper()]
                     raw_msisdn = str(row[msisdn_col[0]]).strip() if msisdn_col else ""
                     sim_clean = re.sub(r'\D', '', raw_msisdn)
                     
                     tagihan_col = [c for c in df_tel.columns if "TAGIHAN" in c.upper() or "BILL" in c.upper() or "AMOUNT" in c.upper()]
                     tagihan_val = str(row[tagihan_col[0]]).strip() if tagihan_col else "0"
-                    
-                    pelanggan_col = [c for c in df_tel.columns if "PELANGGAN" in c.upper() or "NAMA" in c.upper() or "USER" in c.upper()]
-                    nama_pelanggan = str(row[pelanggan_col[0]]).strip() if pelanggan_col else ""
-                    
-                    area_col = [c for c in df_tel.columns if "AREA" in c.upper() or "DEPO" in c.upper() or "SITE" in c.upper()]
-                    area_telkom = str(row[area_col[0]]).strip() if area_col else ""
 
                     depo_val = user_val = mobil_val = sn_val = "-"
-                    ket_val = ""
+                    ket_status = "TIDAK AKTIF" # Default jika nomor tidak terploting ke user
 
-                    # 1. COCOKAN KE DATABASE ITAM INTERNAL
-                    match_db = pd.DataFrame()
-                    if sim_clean != "":
-                        match_db = df_db_clean[df_db_clean["SIM_clean"] == sim_clean]
+                    # A. CEK KE FILE UPDATE USER TERBARU BULAN INI
+                    match_usr = pd.DataFrame()
+                    if not df_users.empty and sim_clean != "" and "SIM_clean" in df_users.columns:
+                        match_usr = df_users[df_users["SIM_clean"] == sim_clean]
 
-                    if not match_db.empty:
-                        target = match_db.iloc[0]
-                        depo_val = str(target.get("Site", "-"))
-                        user_val = str(target.get("User", "-"))
-                        mobil_val = str(target.get("No Mobil", "-"))
-                        sn_val = str(target.get("SN", "-"))
-                        ket_val = "MATCH ITAM"
+                    if not match_usr.empty:
+                        u_target = match_usr.iloc[0]
+                        # DEPO -> Ket Site
+                        depo_val = str(u_target.get("Ket Site", str(u_target.get("Site", "-"))))
+                        
+                        # NAMA USER -> Nama DA / Nama ASP
+                        nama_da = str(u_target.get("Nama DA", "")).strip()
+                        nama_asp = str(u_target.get("Nama ASP", "")).strip()
+                        user_val = nama_da if nama_da != "" else (nama_asp if nama_asp != "" else str(u_target.get("User", "-")))
+                        
+                        # KODE DA/NO MOBIL -> DA / No Mobil
+                        da_val = str(u_target.get("DA", "")).strip()
+                        no_m_val = str(u_target.get("No Mobil", "")).strip()
+                        mobil_val = da_val if da_val != "" else (no_m_val if no_m_val != "" else "-")
+                        
+                        # SN DEVICE
+                        sn_val = str(u_target.get("SN", "-"))
+                        ket_status = "AKTIF"
                     else:
-                        # 2. COCOKAN KE DATA HISTORIS BULAN LALU
-                        match_hist = pd.DataFrame()
-                        if not df_hist.empty and sim_clean != "" and "SIM_clean" in df_hist.columns:
-                            match_hist = df_hist[df_hist["SIM_clean"] == sim_clean]
+                        # B. CEK KE DATABASE ITAM INTERNAL (FALLBACK 1)
+                        match_db = pd.DataFrame()
+                        if sim_clean != "":
+                            match_db = df_db_clean[df_db_clean["SIM_clean"] == sim_clean]
 
-                        if not match_hist.empty:
-                            target_h = match_hist.iloc[0]
-                            depo_val = str(target_h.get("DEPO", area_telkom))
-                            user_val = str(target_h.get("NAMA USER", nama_pelanggan))
-                            mobil_val = str(target_h.get("KODE DA/NO MOBIL", "-"))
-                            sn_val = str(target_h.get("SN DEVICE", "-"))
-                            ket_val = "MATCH HISTORIS"
+                        if not match_db.empty:
+                            target_db = match_db.iloc[0]
+                            depo_val = str(target_db.get("Site", "-"))
+                            user_val = str(target_db.get("User", "-"))
+                            mobil_val = str(target_db.get("No Mobil", "-"))
+                            sn_val = str(target_db.get("SN", "-"))
+                            ket_status = "AKTIF" if user_val not in ["-", ""] else "TIDAK AKTIF"
                         else:
-                            # 3. NOMOR BARU
-                            depo_val = area_telkom if area_telkom else "-"
-                            user_val = nama_pelanggan if nama_pelanggan else "-"
-                            mobil_val = "-"
-                            sn_val = "-"
-                            ket_val = "⚠️ NOMOR BARU"
+                            # C. CEK KE FILE HISTORIS BULAN LALU (FALLBACK 2)
+                            match_hist = pd.DataFrame()
+                            if not df_hist.empty and sim_clean != "" and "SIM_clean" in df_hist.columns:
+                                match_hist = df_hist[df_hist["SIM_clean"] == sim_clean]
 
-                    # 4. DETEKSI KEAKTIFAN USER BULAN INI
-                    if active_users_list and user_val not in ["-", ""]:
-                        u_upper = user_val.upper().strip()
-                        is_active = any(u_act in u_upper or u_upper in u_act for u_act in active_users_list)
-                        if not is_active:
-                            ket_val += " | 🚨 USER NON-AKTIF!"
+                            if not match_hist.empty:
+                                target_h = match_hist.iloc[0]
+                                depo_val = str(target_h.get("DEPO", "-"))
+                                user_val = str(target_h.get("NAMA USER", "-"))
+                                mobil_val = str(target_h.get("KODE DA/NO MOBIL", "-"))
+                                sn_val = str(target_h.get("SN DEVICE", "-"))
+                                ket_status = "AKTIF" if user_val not in ["-", ""] else "TIDAK AKTIF"
 
                     results.append({
                         "DEPO": depo_val,
@@ -446,17 +452,17 @@ with tab7:
                         "NOMOR SIM": raw_msisdn,
                         "TAGIHAN": tagihan_val,
                         "SN DEVICE": sn_val,
-                        "KETERANGAN": ket_val
+                        "KETERANGAN": ket_status
                     })
 
                 st.session_state["plotting_result"] = pd.DataFrame(results)
                 st.success("🎉 **Auto-Plotting Selesai!**")
 
-            # TABEL INTERAKTIF UNTUK EDIT/LENGKAPI DATA SEBELUM DOWNLOAD
+            # TABEL HASIL AKHIR & EXPORT
             if "plotting_result" in st.session_state:
                 st.markdown("---")
-                st.markdown("##### ✏️ Hasil Plotting Final (Dapat Langsung Di-Edit / Dilengkapi):")
-                st.caption("Jika terdapat baris `🚨 USER NON-AKTIF!`, berarti nomor SIM masih aktif ditagihkan Telkom tetapi User-nya sudah tidak terdaftar di file User Aktif bulan ini.")
+                st.markdown("##### ✏️ Hasil Plotting Akhir:")
+                st.caption("Status `AKTIF` jika nomor terploting ke User, dan `TIDAK AKTIF` jika nomor tagihan Telkom tidak terploting ke user mana pun.")
 
                 edited_plotting = st.data_editor(
                     st.session_state["plotting_result"],
@@ -465,16 +471,16 @@ with tab7:
                     num_rows="dynamic"
                 )
 
-                # EXPORT HASIL AKHIR
+                # EXPORT HASIL AKHIR EXCEL
                 output_plot = io.BytesIO()
                 with pd.ExcelWriter(output_plot, engine='openpyxl') as writer:
                     edited_plotting.to_excel(writer, index=False, sheet_name='Hasil_Plotting')
                 excel_plot_data = output_plot.getvalue()
 
                 st.download_button(
-                    "📊 Export Hasil Final ke Excel (.xlsx)", 
+                    "📊 Export Hasil Plotting ke Excel (.xlsx)", 
                     excel_plot_data, 
-                    "hasil_plotting_3way_simcard.xlsx", 
+                    "hasil_plotting_tagihan_telkom.xlsx", 
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     type="primary"
                 )
