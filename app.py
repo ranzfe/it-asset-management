@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+import re
 from datetime import datetime
 from database import (
     load_data, load_logs, save_data, add_log, 
@@ -10,6 +11,36 @@ from ai_assistant import render_ai_assistant
 
 # Konfigurasi Halaman Web
 st.set_page_config(page_title="IT Asset Management", page_icon="💻", layout="wide")
+
+# Fungsi Konversi URL Google Drive ke URL Embed Preview
+def get_gdrive_embed_url(url):
+    if not url or str(url).strip().lower() == 'nan':
+        return None
+    url = str(url).strip()
+    # Ekstrak File ID Google Drive dari berbagai format URL
+    match = re.search(r'(?:file/d/|id=|/d/)([a-zA-Z0-9_-]+)', url)
+    if match:
+        file_id = match.group(1)
+        return f"https://drive.google.com/file/d/{file_id}/preview"
+    return url
+
+# POP-UP DIALOG UNTUK PREVIEW FOTO GOOGLE DRIVE
+@st.dialog("🖼️ Preview Foto Asset")
+def show_photo_popup(sn, model, tipe, user, site, drive_url):
+    st.markdown(f"**SN:** `{sn}` | **Perangkat:** {tipe} {model}")
+    st.markdown(f"**Pengguna:** {user} | **Lokasi Site:** {site}")
+    st.markdown("---")
+    
+    embed_url = get_gdrive_embed_url(drive_url)
+    if embed_url:
+        # Tampilkan Google Drive Foto via HTML iframe di dalam Pop-up
+        st.markdown(
+            f'<iframe src="{embed_url}" width="100%" height="420" style="border:none; border-radius:10px;"></iframe>', 
+            unsafe_allow_html=True
+        )
+        st.markdown(f"🔗 [Buka Foto di Google Drive / Tab Baru]({drive_url})")
+    else:
+        st.warning("⚠️ Belum ada tautan/link foto Google Drive yang valid untuk aset ini.")
 
 # Muat Data
 df_asset = load_data()
@@ -104,6 +135,7 @@ with tab1:
 
     st.caption(f"Menampilkan **{len(df_filtered)}** dari total **{len(df_asset)}** aset.")
     
+    # Menampilkan Dataframe Utama
     st.dataframe(
         df_filtered, 
         use_container_width=True, 
@@ -111,8 +143,8 @@ with tab1:
         column_config={
             "Link Foto Asset": st.column_config.LinkColumn(
                 "Link Foto Asset (Google Drive)",
-                display_text="🖼️ Lihat Foto",
-                help="Klik untuk membuka link foto aset di Google Drive"
+                display_text="🖼️ Link Foto",
+                help="Buka tautan foto langsung di Google Drive"
             ),
             "Purchase Date": st.column_config.DateColumn(
                 "Purchase Date",
@@ -122,16 +154,42 @@ with tab1:
         }
     )
     
-# --- TOMBOL EXPORT (CSV & EXCEL BERDEKATAN) ---
+    # --- TOMBOL PREVIEW FOTO POP-UP & EXPORT ---
     if not df_filtered.empty:
-        # Menggunakan kolom kecil rapat agar tombol berada persis berdampingan di kiri
-        col_ex1, col_ex2, col_ex_empty = st.columns([0.25, 0.3, 1])
+        st.markdown("---")
+        col_p1, col_p2, col_ex1, col_ex2 = st.columns([1.5, 1, 0.8, 1])
         
+        with col_p1:
+            # Dropdown Cepat Pilih SN Aset untuk Dilihat Foto Pop-up nya
+            has_photo_sn = [sn for sn in df_filtered["SN"].unique() if str(sn).strip() != ""]
+            selected_pop_sn = st.selectbox("🖼️ Pilih SN Aset untuk Pratinjau Pop-up Foto:", ["-- Pilih SN --"] + has_photo_sn, key="pop_sn_select")
+        
+        with col_p2:
+            st.write(" ")
+            st.write(" ")
+            if st.button("🔍 Buka Pop-up Foto", type="primary"):
+                if selected_pop_sn != "-- Pilih SN --":
+                    row_target = df_filtered[df_filtered["SN"] == selected_pop_sn].iloc[0]
+                    show_photo_popup(
+                        sn=row_target["SN"],
+                        model=row_target["Model"],
+                        tipe=row_target["Tipe"],
+                        user=row_target["User"],
+                        site=row_target["Site"],
+                        drive_url=row_target["Link Foto Asset"]
+                    )
+                else:
+                    st.warning("Pilih SN Aset terlebih dahulu.")
+
         with col_ex1:
+            st.write(" ")
+            st.write(" ")
             csv_data = df_filtered.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Export CSV", csv_data, "export_it_asset.csv", "text/csv")
             
         with col_ex2:
+            st.write(" ")
+            st.write(" ")
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_filtered.to_excel(writer, index=False, sheet_name='IT_Assets')
