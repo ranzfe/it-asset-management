@@ -333,7 +333,7 @@ with tab6:
     else:
         st.info("Belum ada riwayat aktivitas.")
 
-# TAB 7: PLOTTING TAGIHAN SIMCARD (DENGAN SORTING & FILTER RAPI)
+# TAB 7: PLOTTING TAGIHAN SIMCARD (STATUS DENGAN SYARAT KELENGKAPAN USER)
 with tab7:
     st.subheader("📱 Auto-Plotting Tagihan SIM Card")
     st.caption("Alur Kerja: Tagihan Telkom ➔ Cek Historis (Dapatkan Kode DA/No Mobil) ➔ Validasi Keaktifan & Deep Search SN Device dari Update Bulan Ini.")
@@ -447,7 +447,6 @@ with tab7:
                         tagihan_val = str(row[col_tel_tagihan]).strip() if col_tel_tagihan != "-- Pilih Kolom --" else "0"
 
                         depo_val = user_val = mobil_val = sn_val = "-"
-                        ket_status = "TIDAK AKTIF"
 
                         # ALUR 1: CEK DAHULU KE DATA HISTORIS DARI NOMOR SIM
                         hist_match = pd.DataFrame()
@@ -483,10 +482,8 @@ with tab7:
                             if user_match.empty and sim_clean != "" and "SIM_clean" in df_users.columns:
                                 user_match = df_users[df_users["SIM_clean"] == sim_clean]
 
-                            # JIKA DITEMUKAN DI FILE UPDATE TERBARU BULAN INI (STATUS = AKTIF)
                             if not user_match.empty:
                                 u_row = user_match.iloc[0]
-                                ket_status = "AKTIF"
                                 
                                 # Update DEPO -> Ket Site
                                 if col_u_site != "-- Pilih / Tidak Ada --":
@@ -554,6 +551,13 @@ with tab7:
                                 if mobil_val in ["-", ""]: mobil_val = str(db_target.get("No Mobil", "-"))
                                 sn_val = str(db_target.get("SN", "-"))
 
+                        # SYARAT STATUS AKTIF / TIDAK AKTIF DITENTUKAN HANYA OLEH KEBERADAAN NAMA USER
+                        clean_user_check = str(user_val).strip()
+                        if clean_user_check not in ["", "-", "nan", "None"]:
+                            ket_status = "AKTIF"
+                        else:
+                            ket_status = "TIDAK AKTIF"
+
                         results.append({
                             "DEPO": depo_val,
                             "NAMA USER": user_val,
@@ -565,7 +569,7 @@ with tab7:
                         })
 
                     st.session_state["plotting_result"] = pd.DataFrame(results)
-                    st.success("🎉 **Auto-Plotting Selesai!** Data berhasil ditarik.")
+                    st.success("🎉 **Auto-Plotting Selesai!** Status AKTIF/TIDAK AKTIF diperbarui secara presisi.")
 
             # FITUR SORTING, FILTER, & RINGKASAN REKAPITULASI
             if "plotting_result" in st.session_state and not st.session_state["plotting_result"].empty:
@@ -594,7 +598,6 @@ with tab7:
                 # PROSES SORTING
                 asc_flag = True if sort_order_plot == "A-Z (Asc)" else False
                 if sort_col_plot == "TAGIHAN":
-                    # Convert ke numerik untuk sorting angka tagihan yang benar
                     df_res["_tagihan_num"] = pd.to_numeric(df_res["TAGIHAN"].str.replace(r'\D', '', regex=True), errors='coerce').fillna(0)
                     df_res = df_res.sort_values(by="_tagihan_num", ascending=asc_flag).drop(columns=["_tagihan_num"])
                 else:
@@ -607,7 +610,6 @@ with tab7:
                 tot_aktif = len(df_res[df_res["KETERANGAN"] == "AKTIF"])
                 tot_no_aktif = len(df_res[df_res["KETERANGAN"] == "TIDAK AKTIF"])
                 
-                # Hitung Total Rp Tagihan
                 tagihan_sum = pd.to_numeric(df_res["TAGIHAN"].astype(str).str.replace(r'\D', '', regex=True), errors='coerce').fillna(0).sum()
 
                 col_m1.metric("Total SIM Card", tot_items)
@@ -616,7 +618,7 @@ with tab7:
                 col_m4.metric("Total Tagihan (Rp)", f"Rp {tagihan_sum:,.0f}")
 
                 st.markdown("##### ✏️ Tabel Hasil Plotting Final (Siap Export):")
-                st.caption("Data di bawah sudah terurut dengan rapi. Anda dapat mengedit sel secara manual sebelum mengunduh file Excel.")
+                st.caption("Status `AKTIF` jika memiliki Nama User pemakai, dan `TIDAK AKTIF` jika nomor SIM card tidak terikat ke user manapun.")
 
                 edited_plotting = st.data_editor(
                     df_res,
@@ -625,7 +627,7 @@ with tab7:
                     num_rows="dynamic"
                 )
 
-                # EXPORT HASIL AKHIR EXCEL (DENGAN URUTAN TERBARU)
+                # EXPORT HASIL AKHIR EXCEL
                 output_plot = io.BytesIO()
                 with pd.ExcelWriter(output_plot, engine='openpyxl') as writer:
                     edited_plotting.to_excel(writer, index=False, sheet_name='Hasil_Plotting')
