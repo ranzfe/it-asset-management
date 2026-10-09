@@ -10,9 +10,8 @@ from ai_assistant import render_ai_assistant
 # Konfigurasi Halaman Web
 st.set_page_config(page_title="IT Asset Management", page_icon="💻", layout="wide")
 
-# Muat Data & AI Assistant Sidebar
+# Muat Data
 df_asset = load_data()
-render_ai_assistant()
 
 # --- HEADER & DASHBOARD METRICS ---
 st.title("💻 IT Asset Management System")
@@ -316,3 +315,5 @@ with tab6:
     else:
         st.info("Belum ada riwayat aktivitas.")
 
+# --- DIPANGGIL DI PALING BAWAH AGAR FLOATING STYLING BERJALAN SEMPURNA ---
+render_ai_assistant()
