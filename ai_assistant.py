@@ -57,18 +57,21 @@ def show_ai_dialog():
         st.rerun()
 
 def render_ai_assistant():
-    # Inject CSS khusus untuk memaksa tombol dengan key "ai_float_btn" mengapung di pojok kiri bawah
+    # Inject CSS khusus untuk memaksa tombol melayang tetap di Pojok Kiri Bawah
     st.markdown(
         """
         <style>
-        /* Target khusus tombol floating AI */
+        /* Mengunci posisi tombol di pojok kiri bawah layar */
         div.stButton > button[key="ai_float_btn"],
-        div[data-testid="stColumn"] > div.stButton > button[key="ai_float_btn"],
-        .element-container:has(button[key="ai_float_btn"]) {
+        .stElementContainer:has(button[key="ai_float_btn"]) {
             position: fixed !important;
             bottom: 30px !important;
             left: 30px !important;
             z-index: 9999999 !important;
+        }
+
+        /* Styling visual tombol bulat ungu */
+        div.stButton > button[key="ai_float_btn"] {
             width: 65px !important;
             height: 65px !important;
             border-radius: 50% !important;
@@ -96,6 +99,5 @@ def render_ai_assistant():
         unsafe_allow_html=True
     )
     
-    # Render tombol melayang di pojok kiri bawah
     if st.button("🤖", key="ai_float_btn", help="Buka AI Assistant"):
         show_ai_dialog()
