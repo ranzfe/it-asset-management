@@ -90,34 +90,52 @@ with tab1:
 
 # TAB 2: UPLOAD FILE EXCEL / CSV
 with tab2:
-    st.subheader("Upload File Excel / CSV Untuk Menambah/Update Asset")
-    st.info("Pastikan susunan kolom pada file Excel / CSV Anda menyesuaikan nama kolom berikut:\n\n" + ", ".join(COLUMNS))
+    st.subheader("Upload File Excel / CSV Untuk Menambah Data Aset Baru")
+    st.info("Sistem akan otomatis **memeriksa Serial Number (SN)**. Data dengan SN yang sudah ada di database akan **dilewati (tidak akan duplikat)**.")
     
     uploaded_file = st.file_uploader("Pilih file Excel (.xlsx) atau CSV (.csv)", type=["xlsx", "csv"])
     
     if uploaded_file is not None:
         try:
+            # Membaca file yang diunggah
             if uploaded_file.name.endswith('.csv'):
                 df_upload = pd.read_csv(uploaded_file, dtype=str)
             else:
                 df_upload = pd.read_excel(uploaded_file, dtype=str)
             
-            st.write("Preview Data Yang Diunggah:")
-            st.dataframe(df_upload.head(), use_container_width=True)
+            # Menyesuaikan kolom agar pas dengan format database
+            for col in COLUMNS:
+                if col not in df_upload.columns:
+                    df_upload[col] = ""
+            df_upload = df_upload[COLUMNS]
             
-            if st.button("Simpan Data Unggahan ke Database"):
-                # Menyelaraskan kolom
-                for col in COLUMNS:
-                    if col not in df_upload.columns:
-                        df_upload[col] = ""
+            # --- PROSES CEK DUPLIKASI BERDASARKAN SN ---
+            if not df_asset.empty and "SN" in df_asset.columns:
+                # Ambil daftar SN yang sudah tersimpan di database
+                sn_lama = set(df_asset["SN"].dropna().str.strip().str.upper())
                 
-                df_upload = df_upload[COLUMNS]
-                
-                # Menggabungkan data baru dengan data lama
-                df_combined = pd.concat([df_asset, df_upload], ignore_index=True)
-                save_data(df_combined)
-                st.success(f"Berhasil menambahkan {len(df_upload)} baris data aset baru!")
-                st.rerun()
+                # Filter hanya baris baru yang SN-nya BELUM ADA di database
+                df_baru = df_upload[~df_upload["SN"].astype(str).str.strip().str.upper().isin(sn_lama)]
+                jumlah_duplikat = len(df_upload) - len(df_baru)
+            else:
+                df_baru = df_upload
+                jumlah_duplikat = 0
+
+            st.write("Preview Data Baru Yang Akan Diimpor:")
+            st.dataframe(df_baru, use_container_width=True)
+            
+            if jumlah_duplikat > 0:
+                st.warning(f"⚠️ Ditemukan **{jumlah_duplikat} data duplikat** (SN sudah terdaftar). Data duplikat ini akan otomatis dilewati.")
+
+            if st.button("Simpan Data Baru ke Database"):
+                if not df_baru.empty:
+                    # Gabungkan hanya data yang benar-benar baru
+                    df_combined = pd.concat([df_asset, df_baru], ignore_index=True)
+                    save_data(df_combined)
+                    st.success(f"✅ Berhasil menambahkan **{len(df_baru)} data aset baru**!")
+                    st.rerun()
+                else:
+                    st.info("Semua data dalam file yang Anda unggah sudah ada di database.")
                 
         except Exception as e:
             st.error(f"Terjadi kesalahan saat membaca file: {e}")
