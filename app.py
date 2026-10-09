@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+from datetime import datetime
 
 # Konfigurasi Halaman Web
 st.set_page_config(
@@ -9,8 +10,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# Nama File Database Lokal
+# Nama File Database & Log Lokal
 DB_FILE = "database_asset.csv"
+LOG_FILE = "history_log.csv"
 
 # Daftar Kolom Sesuai Permintaan
 COLUMNS = [
@@ -19,23 +21,49 @@ COLUMNS = [
     "SIM Card", "Imei", "Keterangan"
 ]
 
+LOG_COLUMNS = ["Waktu_Log", "Aksi", "SN", "User_Terkait", "Rincian_Perubahan"]
+
 STATUS_OPTIONS = ["Pakai", "Rusak", "Hilang", "Jual"]
 
-# Fungsi Memuat Data
+# Fungsi Memuat Data Aset
 def load_data():
     if os.path.exists(DB_FILE):
         df = pd.read_csv(DB_FILE, dtype=str)
-        # Pastikan seluruh kolom tersedia
         for col in COLUMNS:
             if col not in df.columns:
                 df[col] = ""
-        return df[COLUMNS]
+        return df[COLUMNS].fillna("")
     else:
         return pd.DataFrame(columns=COLUMNS)
 
-# Fungsi Menyimpan Data
+# Fungsi Memuat Data Log History
+def load_logs():
+    if os.path.exists(LOG_FILE):
+        df = pd.read_csv(LOG_FILE, dtype=str)
+        for col in LOG_COLUMNS:
+            if col not in df.columns:
+                df[col] = ""
+        return df[LOG_COLUMNS].fillna("")
+    else:
+        return pd.DataFrame(columns=LOG_COLUMNS)
+
+# Fungsi Menyimpan Data Aset
 def save_data(df):
-    df.to_csv(DB_FILE, index=False)
+    df[COLUMNS].to_csv(DB_FILE, index=False)
+
+# Fungsi Mencatat Log / Riwayat Perubahan
+def add_log(aksi, sn, user_terkait, rincian):
+    df_logs = load_logs()
+    waktu_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_log = {
+        "Waktu_Log": waktu_now,
+        "Aksi": aksi,
+        "SN": sn,
+        "User_Terkait": user_terkait,
+        "Rincian_Perubahan": rincian
+    }
+    df_updated_log = pd.concat([pd.DataFrame([new_log]), df_logs], ignore_index=True)
+    df_updated_log.to_csv(LOG_FILE, index=False)
 
 # Inisialisasi Data
 df_asset = load_data()
@@ -61,13 +89,17 @@ col5.metric("Jual", jual_count)
 st.markdown("---")
 
 # --- TAB FITUR UTAMA ---
-tab1, tab2, tab3 = st.tabs(["📋 Daftar & Filter Aset", "📤 Upload Excel/CSV", "➕ Tambah Manual"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📋 Daftar & Filter Aset", 
+    "📤 Upload Excel/CSV", 
+    "➕ Tambah Manual",
+    "📜 Log History"
+])
 
 # TAB 1: LIHAT & FILTER DATA
 with tab1:
     st.subheader("Daftar Aset Terdaftar")
     
-    # Filter Pencarian
     search_term = st.text_input("🔍 Cari (berdasarkan SN, User, Site, Tipe, dll):", "")
     
     df_filtered = df_asset.copy()
@@ -75,10 +107,8 @@ with tab1:
         mask = df_filtered.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)
         df_filtered = df_filtered[mask]
     
-    # Tampilkan Tabel Data
     st.dataframe(df_filtered, use_container_width=True, hide_index=True)
     
-    # Tombol Download Data Saat Ini
     if not df_filtered.empty:
         csv = df_filtered.to_csv(index=False).encode('utf-8')
         st.download_button(
@@ -88,54 +118,85 @@ with tab1:
             mime="text/csv"
         )
 
-# TAB 2: UPLOAD FILE EXCEL / CSV
+# TAB 2: UPLOAD FILE EXCEL / CSV (DENGAN CATATAN HISTORY)
 with tab2:
-    st.subheader("Upload File Excel / CSV Untuk Menambah Data Aset Baru")
-    st.info("Sistem akan otomatis **memeriksa Serial Number (SN)**. Data dengan SN yang sudah ada di database akan **dilewati (tidak akan duplikat)**.")
+    st.subheader("Upload File Excel / CSV Untuk Menambah atau Memperbarui Data Aset")
+    st.info("💡 **Fitur Cerdas & Log:** Data dengan **SN baru** akan ditambahkan. Data dengan **SN lama** akan diperbarui (*update*) dan perubahan perilakunya akan dicatat otomatis di **Log History**.")
     
     uploaded_file = st.file_uploader("Pilih file Excel (.xlsx) atau CSV (.csv)", type=["xlsx", "csv"])
     
     if uploaded_file is not None:
         try:
-            # Membaca file yang diunggah
             if uploaded_file.name.endswith('.csv'):
                 df_upload = pd.read_csv(uploaded_file, dtype=str)
             else:
                 df_upload = pd.read_excel(uploaded_file, dtype=str)
             
-            # Menyesuaikan kolom agar pas dengan format database
             for col in COLUMNS:
                 if col not in df_upload.columns:
                     df_upload[col] = ""
-            df_upload = df_upload[COLUMNS]
+            df_upload = df_upload[COLUMNS].fillna("")
             
-            # --- PROSES CEK DUPLIKASI BERDASARKAN SN ---
-            if not df_asset.empty and "SN" in df_asset.columns:
-                # Ambil daftar SN yang sudah tersimpan di database
-                sn_lama = set(df_asset["SN"].dropna().str.strip().str.upper())
+            st.write("Preview Data Yang Diunggah:")
+            st.dataframe(df_upload.head(), use_container_width=True)
+            
+            if st.button("Proses Simpan & Update Data"):
+                df_current = df_asset.copy().fillna("")
                 
-                # Filter hanya baris baru yang SN-nya BELUM ADA di database
-                df_baru = df_upload[~df_upload["SN"].astype(str).str.strip().str.upper().isin(sn_lama)]
-                jumlah_duplikat = len(df_upload) - len(df_baru)
-            else:
-                df_baru = df_upload
-                jumlah_duplikat = 0
-
-            st.write("Preview Data Baru Yang Akan Diimpor:")
-            st.dataframe(df_baru, use_container_width=True)
-            
-            if jumlah_duplikat > 0:
-                st.warning(f"⚠️ Ditemukan **{jumlah_duplikat} data duplikat** (SN sudah terdaftar). Data duplikat ini akan otomatis dilewati.")
-
-            if st.button("Simpan Data Baru ke Database"):
-                if not df_baru.empty:
-                    # Gabungkan hanya data yang benar-benar baru
-                    df_combined = pd.concat([df_asset, df_baru], ignore_index=True)
-                    save_data(df_combined)
-                    st.success(f"✅ Berhasil menambahkan **{len(df_baru)} data aset baru**!")
+                if not df_current.empty and "SN" in df_current.columns:
+                    df_current["SN_clean"] = df_current["SN"].astype(str).str.strip().str.upper()
+                    df_upload["SN_clean"] = df_upload["SN"].astype(str).str.strip().str.upper()
+                    
+                    count_update = 0
+                    count_baru = 0
+                    
+                    for idx, row in df_upload.iterrows():
+                        sn_val = row["SN_clean"]
+                        if sn_val != "":
+                            match = df_current[df_current["SN_clean"] == sn_val]
+                            if not match.empty:
+                                # Update data lama & catat log perubahan
+                                match_idx = match.index[0]
+                                perubahans = []
+                                for col in COLUMNS:
+                                    val_lama = str(df_current.at[match_idx, col]).strip()
+                                    val_baru = str(row[col]).strip()
+                                    if val_baru != "" and val_baru != val_lama:
+                                        df_current.at[match_idx, col] = val_baru
+                                        perubahans.append(f"{col}: '{val_lama}' ➔ '{val_baru}'")
+                                
+                                if perubahans:
+                                    count_update += 1
+                                    add_log(
+                                        aksi="UPDATE (via Upload)",
+                                        sn=row["SN"],
+                                        user_terkait=row["User"],
+                                        rincian="; ".join(perubahans)
+                                    )
+                            else:
+                                # Data baru
+                                new_row = row[COLUMNS].to_dict()
+                                df_current = pd.concat([df_current, pd.DataFrame([new_row])], ignore_index=True)
+                                count_baru += 1
+                                add_log(
+                                    aksi="TAMBAH BARU (via Upload)",
+                                    sn=row["SN"],
+                                    user_terkait=row["User"],
+                                    rincian=f"Aset baru ditambahkan (Model: {row['Model']}, Site: {row['Site']})"
+                                )
+                    
+                    if "SN_clean" in df_current.columns:
+                        df_current = df_current.drop(columns=["SN_clean"])
+                        
+                    save_data(df_current[COLUMNS])
+                    st.success(f"✅ Selesai! **{count_baru} data baru** ditambahkan, dan **{count_update} data lama** diperbarui!")
                     st.rerun()
                 else:
-                    st.info("Semua data dalam file yang Anda unggah sudah ada di database.")
+                    save_data(df_upload[COLUMNS])
+                    for idx, row in df_upload.iterrows():
+                        add_log("TAMBAH BARU (Upload Perdana)", row["SN"], row["User"], "Inisialisasi data aset pertamanya.")
+                    st.success(f"✅ Berhasil menyimpan {len(df_upload)} data aset pertama!")
+                    st.rerun()
                 
         except Exception as e:
             st.error(f"Terjadi kesalahan saat membaca file: {e}")
@@ -171,24 +232,32 @@ with tab3:
         
         if submitted:
             new_data = {
-                "Ket Wilayah": ket_wilayah,
-                "SN": sn,
-                "Tipe": tipe,
-                "Model": model,
-                "Status Beli": status_beli,
-                "Asal PO": asal_po,
-                "Status": status,
-                "NIK": nik,
-                "User": user,
-                "Kd Site": kd_site,
-                "Site": site,
-                "No Mobil": no_mobil,
-                "SIM Card": sim_card,
-                "Imei": imei,
-                "Keterangan": keterangan
+                "Ket Wilayah": ket_wilayah, "SN": sn, "Tipe": tipe, "Model": model,
+                "Status Beli": status_beli, "Asal PO": asal_po, "Status": status,
+                "NIK": nik, "User": user, "Kd Site": kd_site, "Site": site,
+                "No Mobil": no_mobil, "SIM Card": sim_card, "Imei": imei, "Keterangan": keterangan
             }
             df_new = pd.DataFrame([new_data])
             df_updated = pd.concat([df_asset, df_new], ignore_index=True)
             save_data(df_updated)
+            
+            # Catat ke Log History
+            add_log("TAMBAH BARU (Manual)", sn, user, f"Tambah manual Aset Tipe {tipe} Model {model} di Site {site}")
+            
             st.success("Aset berhasil ditambahkan secara manual!")
             st.rerun()
+
+# TAB 4: LOG HISTORY / RIWAYAT PERUBAHAN
+with tab4:
+    st.subheader("📜 Riwayat & Log Perubahan Data Aset")
+    df_logs = load_logs()
+    
+    if not df_logs.empty:
+        search_log = st.text_input("🔍 Cari di Log History (SN, Tanggal, User, Aksi):", "")
+        if search_log:
+            mask_log = df_logs.apply(lambda row: row.astype(str).str.contains(search_log, case=False).any(), axis=1)
+            df_logs = df_logs[mask_log]
+            
+        st.dataframe(df_logs, use_container_width=True, hide_index=True)
+    else:
+        st.info("Belum ada riwayat aktivitas perubahan data.")
