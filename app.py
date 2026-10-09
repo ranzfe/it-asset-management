@@ -14,7 +14,7 @@ st.set_page_config(
 DB_FILE = "database_asset.csv"
 LOG_FILE = "history_log.csv"
 
-# Daftar Kolom
+# Daftar Kolom Sesuai Permintaan
 COLUMNS = [
     "Ket Wilayah", "SN", "Tipe", "Model", "Status Beli", "Asal PO",
     "Status", "NIK", "User", "Kd Site", "Site", "No Mobil",
@@ -50,7 +50,7 @@ def load_logs():
 def save_data(df):
     df[COLUMNS].to_csv(DB_FILE, index=False)
 
-# Fungsi Catat Log
+# Fungsi Catat Log Perubahan
 def add_log(aksi, sn, user_terkait, rincian):
     df_logs = load_logs()
     waktu_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -64,7 +64,7 @@ def add_log(aksi, sn, user_terkait, rincian):
     df_updated_log = pd.concat([pd.DataFrame([new_log]), df_logs], ignore_index=True)
     df_updated_log.to_csv(LOG_FILE, index=False)
 
-# Inisialisasi Data
+# Inisialisasi Data Utama
 df_asset = load_data()
 
 # --- HEADER APLIKASI ---
@@ -168,7 +168,6 @@ with tab2:
                     if submit_edit:
                         idx_target = df_asset[df_asset["SN"] == selected_sn].index[0]
                         
-                        # Cek rincian perubahan
                         updated_vals = {
                             "Ket Wilayah": ket_wilayah_edit, "SN": selected_sn, "Tipe": tipe_edit,
                             "Model": model_edit, "Status Beli": status_beli_edit, "Asal PO": asal_po_edit,
@@ -208,7 +207,7 @@ with tab2:
 # TAB 3: UPLOAD FILE EXCEL / CSV
 with tab3:
     st.subheader("Upload File Excel / CSV Untuk Menambah atau Memperbarui Data Aset")
-    st.info("💡 **Fitur Cerdas:** Data dengan **SN baru** akan ditambahkan. Data dengan **SN lama** akan diperbarui (*update*) keteangannya.")
+    st.info("💡 **Fitur Cerdas:** Data dengan **SN baru** akan ditambahkan. Data dengan **SN lama** akan diperbarui (*update*) informasinya.")
     
     uploaded_file = st.file_uploader("Pilih file Excel (.xlsx) atau CSV (.csv)", type=["xlsx", "csv"])
     
@@ -253,4 +252,84 @@ with tab3:
                                 
                                 if perubahans:
                                     count_update += 1
-                                    add
+                                    add_log("UPDATE (via Upload)", row["SN"], row["User"], "; ".join(perubahans))
+                            else:
+                                new_row = row[COLUMNS].to_dict()
+                                df_current = pd.concat([df_current, pd.DataFrame([new_row])], ignore_index=True)
+                                count_baru += 1
+                                add_log("TAMBAH BARU (via Upload)", row["SN"], row["User"], f"Aset baru ditambahkan (Model: {row['Model']}, Site: {row['Site']})")
+                    
+                    if "SN_clean" in df_current.columns:
+                        df_current = df_current.drop(columns=["SN_clean"])
+                        
+                    save_data(df_current[COLUMNS])
+                    st.success(f"✅ Selesai! **{count_baru} data baru** ditambahkan, dan **{count_update} data lama** diperbarui!")
+                    st.rerun()
+                else:
+                    save_data(df_upload[COLUMNS])
+                    for idx, row in df_upload.iterrows():
+                        add_log("TAMBAH BARU (Upload Perdana)", row["SN"], row["User"], "Inisialisasi data aset pertamanya.")
+                    st.success(f"✅ Berhasil menyimpan {len(df_upload)} data aset pertama!")
+                    st.rerun()
+                
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat membaca file: {e}")
+
+# TAB 4: TAMBAH MANUAL
+with tab4:
+    st.subheader("Form Tambah Aset Manual")
+    with st.form("form_tambah_aset", clear_on_submit=True):
+        col_a, col_b, col_c = st.columns(3)
+        
+        with col_a:
+            ket_wilayah = st.text_input("Ket Wilayah")
+            sn = st.text_input("SN (Serial Number)")
+            tipe = st.text_input("Tipe")
+            model = st.text_input("Model")
+            status_beli = st.text_input("Status Beli")
+            
+        with col_b:
+            asal_po = st.text_input("Asal PO")
+            status = st.selectbox("Status", STATUS_OPTIONS)
+            nik = st.text_input("NIK")
+            user = st.text_input("User")
+            kd_site = st.text_input("Kd Site")
+            
+        with col_c:
+            site = st.text_input("Site")
+            no_mobil = st.text_input("No Mobil")
+            sim_card = st.text_input("SIM Card")
+            imei = st.text_input("Imei")
+            keterangan = st.text_area("Keterangan")
+            
+        submitted = st.form_submit_button("Simpan Aset")
+        
+        if submitted:
+            new_data = {
+                "Ket Wilayah": ket_wilayah, "SN": sn, "Tipe": tipe, "Model": model,
+                "Status Beli": status_beli, "Asal PO": asal_po, "Status": status,
+                "NIK": nik, "User": user, "Kd Site": kd_site, "Site": site,
+                "No Mobil": no_mobil, "SIM Card": sim_card, "Imei": imei, "Keterangan": keterangan
+            }
+            df_new = pd.DataFrame([new_data])
+            df_updated = pd.concat([df_asset, df_new], ignore_index=True)
+            save_data(df_updated)
+            
+            add_log("TAMBAH BARU (Manual)", sn, user, f"Tambah manual Aset Tipe {tipe} Model {model} di Site {site}")
+            st.success("Aset berhasil ditambahkan secara manual!")
+            st.rerun()
+
+# TAB 5: LOG HISTORY
+with tab5:
+    st.subheader("📜 Riwayat & Log Perubahan Data Aset")
+    df_logs = load_logs()
+    
+    if not df_logs.empty:
+        search_log = st.text_input("🔍 Cari di Log History (SN, Tanggal, User, Aksi):", "")
+        if search_log:
+            mask_log = df_logs.apply(lambda row: row.astype(str).str.contains(search_log, case=False).any(), axis=1)
+            df_logs = df_logs[mask_log]
+            
+        st.dataframe(df_logs, use_container_width=True, hide_index=True)
+    else:
+        st.info("Belum ada riwayat aktivitas perubahan data.")
