@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+from datetime import datetime
 from database import (
     load_data, load_logs, save_data, add_log, 
     COLUMNS, STATUS_OPTIONS
@@ -77,7 +78,7 @@ with tab1:
             filter_site = st.selectbox("Filter Site:", site_list)
             
         with col_s1:
-            sort_column = st.selectbox("Urutkan Berdasarkan (Sort By):", ["SN", "User", "Site", "Tipe", "Status", "Model"])
+            sort_column = st.selectbox("Urutkan Berdasarkan (Sort By):", ["SN", "User", "Site", "Tipe", "Purchase Date", "Status", "Model"])
         with col_s2:
             sort_order = st.radio("Urutan:", ["A-Z (Asc)", "Z-A (Desc)"])
 
@@ -103,7 +104,6 @@ with tab1:
 
     st.caption(f"Menampilkan **{len(df_filtered)}** dari total **{len(df_asset)}** aset.")
     
-    # Konfigurasi Kolom Tautan/Link Google Drive
     st.dataframe(
         df_filtered, 
         use_container_width=True, 
@@ -113,6 +113,11 @@ with tab1:
                 "Link Foto Asset (Google Drive)",
                 display_text="🖼️ Lihat Foto",
                 help="Klik untuk membuka link foto aset di Google Drive"
+            ),
+            "Purchase Date": st.column_config.DateColumn(
+                "Purchase Date",
+                format="YYYY-MM-DD",
+                help="Tanggal Pembelian Aset"
             )
         }
     )
@@ -170,17 +175,19 @@ with tab3:
                         sn_edit = st.text_input("SN", value=str(asset_row["SN"]), disabled=True)
                         tipe_edit = st.text_input("Tipe", value=str(asset_row["Tipe"]))
                         model_edit = st.text_input("Model", value=str(asset_row["Model"]))
+                        p_date_val = str(asset_row["Purchase Date"]).strip()
+                        purchase_date_edit = st.text_input("Purchase Date (YYYY-MM-DD)", value=p_date_val)
                         status_beli_edit = st.text_input("Status Beli", value=str(asset_row["Status Beli"]))
-                        asal_po_edit = st.text_input("Asal PO", value=str(asset_row["Asal PO"]))
                     with col_b:
+                        asal_po_edit = st.text_input("Asal PO", value=str(asset_row["Asal PO"]))
                         curr_status = str(asset_row["Status"])
                         status_idx = STATUS_OPTIONS.index(curr_status) if curr_status in STATUS_OPTIONS else 0
                         status_edit = st.selectbox("Status", STATUS_OPTIONS, index=status_idx)
                         nik_edit = st.text_input("NIK", value=str(asset_row["NIK"]))
                         user_edit = st.text_input("User", value=str(asset_row["User"]))
                         kd_site_edit = st.text_input("Kd Site", value=str(asset_row["Kd Site"]))
-                        site_edit = st.text_input("Site", value=str(asset_row["Site"]))
                     with col_c:
+                        site_edit = st.text_input("Site", value=str(asset_row["Site"]))
                         no_mobil_edit = st.text_input("No Mobil", value=str(asset_row["No Mobil"]))
                         sim_card_edit = st.text_input("SIM Card", value=str(asset_row["SIM Card"]))
                         imei_edit = st.text_input("Imei", value=str(asset_row["Imei"]))
@@ -190,12 +197,13 @@ with tab3:
                     if st.form_submit_button("💾 Simpan Perubahan"):
                         idx_target = df_asset[df_asset["SN"] == selected_sn].index[0]
                         updated_vals = {
-                            "SN": selected_sn, "Tipe": tipe_edit, "Model": model_edit, 
-                            "Status Beli": status_beli_edit, "Asal PO": asal_po_edit,
-                            "Status": status_edit, "NIK": nik_edit, "User": user_edit,
-                            "Kd Site": kd_site_edit, "Site": site_edit, "No Mobil": no_mobil_edit,
-                            "SIM Card": sim_card_edit, "Imei": imei_edit, 
-                            "Link Foto Asset": foto_edit, "Keterangan": keterangan_edit
+                            "SN": selected_sn, "Tipe": tipe_edit, "Model": model_edit,
+                            "Purchase Date": purchase_date_edit, "Status Beli": status_beli_edit, 
+                            "Asal PO": asal_po_edit, "Status": status_edit, "NIK": nik_edit, 
+                            "User": user_edit, "Kd Site": kd_site_edit, "Site": site_edit, 
+                            "No Mobil": no_mobil_edit, "SIM Card": sim_card_edit, 
+                            "Imei": imei_edit, "Link Foto Asset": foto_edit, 
+                            "Keterangan": keterangan_edit
                         }
                         perubahans = []
                         for col in COLUMNS:
@@ -285,15 +293,16 @@ with tab5:
             sn = st.text_input("SN")
             tipe = st.text_input("Tipe")
             model = st.text_input("Model")
+            purchase_date = st.date_input("Purchase Date (Tanggal Beli)", value=None)
             status_beli = st.text_input("Status Beli")
-            asal_po = st.text_input("Asal PO")
         with col_b:
+            asal_po = st.text_input("Asal PO")
             status = st.selectbox("Status", STATUS_OPTIONS)
             nik = st.text_input("NIK")
             user = st.text_input("User")
             kd_site = st.text_input("Kd Site")
-            site = st.text_input("Site")
         with col_c:
+            site = st.text_input("Site")
             no_mobil = st.text_input("No Mobil")
             sim_card = st.text_input("SIM Card")
             imei = st.text_input("Imei")
@@ -301,12 +310,14 @@ with tab5:
             keterangan = st.text_area("Keterangan")
             
         if st.form_submit_button("Simpan Aset"):
+            p_date_str = purchase_date.strftime("%Y-%m-%d") if purchase_date else ""
             new_data = {
                 "SN": sn, "Tipe": tipe, "Model": model,
-                "Status Beli": status_beli, "Asal PO": asal_po, "Status": status, 
-                "NIK": nik, "User": user, "Kd Site": kd_site, "Site": site, 
-                "No Mobil": no_mobil, "SIM Card": sim_card, "Imei": imei, 
-                "Link Foto Asset": foto, "Keterangan": keterangan
+                "Purchase Date": p_date_str, "Status Beli": status_beli, 
+                "Asal PO": asal_po, "Status": status, "NIK": nik, "User": user, 
+                "Kd Site": kd_site, "Site": site, "No Mobil": no_mobil, 
+                "SIM Card": sim_card, "Imei": imei, "Link Foto Asset": foto, 
+                "Keterangan": keterangan
             }
             save_data(pd.concat([df_asset, pd.DataFrame([new_data])], ignore_index=True))
             add_log("TAMBAH BARU (Manual)", sn, user, f"Tambah manual Aset {tipe} {model}")
@@ -325,5 +336,5 @@ with tab6:
     else:
         st.info("Belum ada riwayat aktivitas.")
 
-# --- RENDER AI ASSISTANT FLOATING BUTTON (DI PALING BAWAH) ---
+# RENDER AI ASSISTANT SIDEBAR
 render_ai_assistant()
