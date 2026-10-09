@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 from database import load_data, load_logs
 
 def render_ai_assistant():
@@ -42,7 +43,19 @@ def render_ai_assistant():
                     response += f"- **User:** {row['User']} (NIK: {row['NIK']})\n"
                     response += f"- **Status:** `{row['Status']}` | **Site:** {row['Site']} ({row['Kd Site']})\n"
                     
-                    # Cek dan Tampilkan Link Foto jika ada
+                    # Hitung Usia & Rekomendasi Peremajaan
+                    p_date_str = str(row.get('Purchase Date', '')).strip()
+                    if p_date_str and p_date_str.lower() != 'nan':
+                        try:
+                            p_date = datetime.strptime(p_date_str[:10], "%Y-%m-%d")
+                            years = (datetime.now() - p_date).days / 365.25
+                            response += f"- **Tanggal Beli:** {p_date_str[:10]} ({years:.1f} tahun)\n"
+                            if years >= 3.0:
+                                response += f"- ⚠️ **Status Usia:** *Sudah > 3 tahun (Direkomendasikan Peremajaan)*\n"
+                        except:
+                            response += f"- **Tanggal Beli:** {p_date_str}\n"
+                    
+                    # Cek Link Foto
                     link_foto = str(row.get('Link Foto Asset', '')).strip()
                     if link_foto and link_foto.lower() != 'nan':
                         response += f"- **Link Foto:** [🖼️ Lihat Foto Google Drive]({link_foto})\n"
