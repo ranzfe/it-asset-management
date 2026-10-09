@@ -122,18 +122,21 @@ with tab1:
         }
     )
     
-    # --- TOMBOL EXPORT ---
+# --- TOMBOL EXPORT (CSV & EXCEL BERDEKATAN) ---
     if not df_filtered.empty:
-        col_ex1, col_ex2 = st.columns([1, 1])
+        # Menggunakan kolom kecil rapat agar tombol berada persis berdampingan di kiri
+        col_ex1, col_ex2, col_ex_empty = st.columns([0.25, 0.3, 1])
+        
         with col_ex1:
             csv_data = df_filtered.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Export Hasil Filter ke CSV", csv_data, "export_it_asset.csv", "text/csv")
+            st.download_button("📥 Export CSV", csv_data, "export_it_asset.csv", "text/csv")
+            
         with col_ex2:
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_filtered.to_excel(writer, index=False, sheet_name='IT_Assets')
             excel_data = output.getvalue()
-            st.download_button("📊 Export Hasil Filter ke Excel (.xlsx)", excel_data, "export_it_asset.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.download_button("📊 Export Excel (.xlsx)", excel_data, "export_it_asset.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # TAB 2: ANALYTICS & GRAFIK
 with tab2:
