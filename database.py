@@ -5,10 +5,11 @@ from datetime import datetime
 DB_FILE = "database_asset.csv"
 LOG_FILE = "history_log.csv"
 
+# Kolom Baru: 'Ket Wilayah' Dihapus, Digantikan oleh 'Link Foto Asset'
 COLUMNS = [
-    "Ket Wilayah", "SN", "Tipe", "Model", "Status Beli", "Asal PO",
+    "SN", "Tipe", "Model", "Status Beli", "Asal PO",
     "Status", "NIK", "User", "Kd Site", "Site", "No Mobil",
-    "SIM Card", "Imei", "Keterangan"
+    "SIM Card", "Imei", "Link Foto Asset", "Keterangan"
 ]
 
 LOG_COLUMNS = ["Waktu_Log", "Aksi", "SN", "User_Terkait", "Rincian_Perubahan"]
@@ -17,6 +18,9 @@ STATUS_OPTIONS = ["Pakai", "Rusak", "Hilang", "Jual", "Cadangan", "Cek"]
 def load_data():
     if os.path.exists(DB_FILE):
         df = pd.read_csv(DB_FILE, dtype=str)
+        # Migrasi: Hapus kolom lama jika ada
+        if "Ket Wilayah" in df.columns:
+            df = df.drop(columns=["Ket Wilayah"])
         for col in COLUMNS:
             if col not in df.columns:
                 df[col] = ""
