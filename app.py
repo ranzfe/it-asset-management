@@ -153,7 +153,7 @@ with tab1:
             ),
             "Link Foto Asset": st.column_config.LinkColumn(
                 "Link Foto Asset (Google Drive)",
-                display_text="🔗 Buka Link GD",
+                display_text="🔗 Buka Link Foto",
                 help="Klik untuk membuka langsung di Google Drive"
             ),
             "Purchase Date": st.column_config.DateColumn(
