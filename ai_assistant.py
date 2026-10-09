@@ -57,33 +57,30 @@ def show_ai_dialog():
         st.rerun()
 
 def render_ai_assistant():
-    # 1. Tombol Tersembunyi Streamlit untuk memicu Modal AI
-    if st.button("TRIGGER_AI", key="hidden_ai_trigger"):
-        show_ai_dialog()
-
-    # 2. Inject CSS & JS untuk menyembunyikan tombol asli dan membuat Floating Button Murni
+    # Inject CSS Murni untuk Mengubah Tombol Streamlit Menjadi Floating Button di Pojok Kiri Bawah
     st.markdown(
         """
         <style>
-        /* Sembunyikan tombol trigger bawaan Streamlit */
-        div.stButtonHasFocus > button[key="hidden_ai_trigger"],
-        .element-container:has(button[key="hidden_ai_trigger"]) {
-            display: none !important;
-            height: 0px !important;
-            margin: 0px !important;
-            padding: 0px !important;
-        }
-
-        /* Tombol Bulat Melayang Murni di Pojok Kiri Bawah */
-        #custom-floating-ai-btn {
+        /* Mengubah container tombol khusus key "ai_float_btn" menjadi Fixed Floating Overlay */
+        div.stButton:has(button[key="ai_float_btn"]),
+        div.stElementContainer:has(button[key="ai_float_btn"]) {
             position: fixed !important;
             bottom: 30px !important;
             left: 30px !important;
+            z-index: 99999999 !important;
+            width: 65px !important;
+            height: 65px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Styling Visual Tombol Bulat Ungu Melayang */
+        button[key="ai_float_btn"] {
             width: 65px !important;
             height: 65px !important;
             border-radius: 50% !important;
             background: linear-gradient(135deg, #7C5CFF 0%, #5E35B1 100%) !important;
-            color: white !important;
+            color: #ffffff !important;
             border: 2px solid rgba(255, 255, 255, 0.4) !important;
             box-shadow: 0 8px 25px rgba(124, 92, 255, 0.7) !important;
             font-size: 32px !important;
@@ -91,33 +88,25 @@ def render_ai_assistant():
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            z-index: 99999999 !important;
+            padding: 0 !important;
+            margin: 0 !important;
             transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-            user-select: none !important;
         }
 
-        #custom-floating-ai-btn:hover {
+        button[key="ai_float_btn"]:hover {
             transform: scale(1.15) rotate(8deg) !important;
             box-shadow: 0 12px 32px rgba(124, 92, 255, 0.9) !important;
             background: linear-gradient(135deg, #8A6CFF 0%, #6A3DE8 100%) !important;
         }
-        </style>
 
-        <!-- HTML Floating Button -->
-        <div id="custom-floating-ai-btn" title="Buka AI Assistant" onclick="triggerAiClick()">🤖</div>
-
-        <script>
-        function triggerAiClick() {
-            // Mencari tombol trigger asli dan menstimulasi klik
-            var buttons = window.parent.document.querySelectorAll('button');
-            for (var i = 0; i < buttons.length; i++) {
-                if (buttons[i].innerText.includes('TRIGGER_AI')) {
-                    buttons[i].click();
-                    break;
-                }
-            }
+        button[key="ai_float_btn"]:active {
+            transform: scale(0.95) !important;
         }
-        </script>
+        </style>
         """,
         unsafe_allow_html=True
     )
+    
+    # Tombol Native Streamlit yang di-transformasi oleh CSS di atas
+    if st.button("🤖", key="ai_float_btn", help="Buka AI Assistant"):
+        show_ai_dialog()
