@@ -5,7 +5,6 @@ from database import (
     load_data, load_logs, save_data, add_log, 
     COLUMNS, STATUS_OPTIONS
 )
-from ai_assistant import render_ai_assistant
 
 # Konfigurasi Halaman Web
 st.set_page_config(page_title="IT Asset Management", page_icon="💻", layout="wide")
