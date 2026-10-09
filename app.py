@@ -33,7 +33,7 @@ def show_photo_popup(sn, model, tipe, user, site, drive_url):
     
     embed_url = get_gdrive_embed_url(drive_url)
     if embed_url:
-        # Tampilkan Google Drive Foto via HTML iframe di dalam Pop-up
+        # Tampilkan Foto Google Drive via iframe
         st.markdown(
             f'<iframe src="{embed_url}" width="100%" height="420" style="border:none; border-radius:10px;"></iframe>', 
             unsafe_allow_html=True
@@ -42,7 +42,7 @@ def show_photo_popup(sn, model, tipe, user, site, drive_url):
     else:
         st.warning("⚠️ Belum ada tautan/link foto Google Drive yang valid untuk aset ini.")
 
-# Muat Data
+# Muat Data Utama
 df_asset = load_data()
 
 # --- HEADER & DASHBOARD METRICS ---
@@ -73,7 +73,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📜 Log History"
 ])
 
-# TAB 1: LIHAT, SORT, & FILTER DATA
+# TAB 1: LIHAT, SORT, & FILTER DATA (SOLUSI 1: INTERAKTIF DATA EDITOR)
 with tab1:
     st.subheader("Daftar Aset Terdaftar")
     
@@ -135,61 +135,58 @@ with tab1:
 
     st.caption(f"Menampilkan **{len(df_filtered)}** dari total **{len(df_asset)}** aset.")
     
-    # Menampilkan Dataframe Utama
-    st.dataframe(
-        df_filtered, 
+    # --- TABEL INTERAKTIF SOLUSI 1 ---
+    # Menambahkan kolom temporer 'Preview Foto' berupa Checkbox
+    df_display = df_filtered.copy()
+    df_display.insert(0, "Preview Foto", False)
+
+    edited_df = st.data_editor(
+        df_display, 
         use_container_width=True, 
         hide_index=True,
+        disabled=[col for col in COLUMNS],  # Mengunci kolom data agar tidak bisa diedit tidak sengaja
         column_config={
+            "Preview Foto": st.column_config.CheckboxColumn(
+                "🖼️ Preview Foto",
+                help="Centang kotak ini untuk membuka Pop-Up Foto Google Drive secara langsung!",
+                default=False
+            ),
             "Link Foto Asset": st.column_config.LinkColumn(
                 "Link Foto Asset (Google Drive)",
-                display_text="🖼️ Link Foto",
-                help="Buka tautan foto langsung di Google Drive"
+                display_text="🔗 Buka Link GD",
+                help="Klik untuk membuka langsung di Google Drive"
             ),
             "Purchase Date": st.column_config.DateColumn(
                 "Purchase Date",
                 format="YYYY-MM-DD",
                 help="Tanggal Pembelian Aset"
             )
-        }
+        },
+        key="editor_asset_table"
     )
     
-    # --- TOMBOL PREVIEW FOTO POP-UP & EXPORT ---
+    # Deteksi Cikan Checkbox 'Preview Foto' untuk Memicu Pop-Up Dialog
+    if "editor_asset_table" in st.session_state and "edited_rows" in st.session_state["editor_asset_table"]:
+        edited_rows = st.session_state["editor_asset_table"]["edited_rows"]
+        for row_idx, changes in edited_rows.items():
+            if changes.get("Preview Foto") == True:
+                row_target = df_filtered.iloc[row_idx]
+                show_photo_popup(
+                    sn=row_target["SN"],
+                    model=row_target["Model"],
+                    tipe=row_target["Tipe"],
+                    user=row_target["User"],
+                    site=row_target["Site"],
+                    drive_url=row_target["Link Foto Asset"]
+                )
+    
+    # --- TOMBOL EXPORT (CSV & EXCEL BERDEKATAN) ---
     if not df_filtered.empty:
-        st.markdown("---")
-        col_p1, col_p2, col_ex1, col_ex2 = st.columns([1.5, 1, 0.8, 1])
-        
-        with col_p1:
-            # Dropdown Cepat Pilih SN Aset untuk Dilihat Foto Pop-up nya
-            has_photo_sn = [sn for sn in df_filtered["SN"].unique() if str(sn).strip() != ""]
-            selected_pop_sn = st.selectbox("🖼️ Pilih SN Aset untuk Pratinjau Pop-up Foto:", ["-- Pilih SN --"] + has_photo_sn, key="pop_sn_select")
-        
-        with col_p2:
-            st.write(" ")
-            st.write(" ")
-            if st.button("🔍 Buka Pop-up Foto", type="primary"):
-                if selected_pop_sn != "-- Pilih SN --":
-                    row_target = df_filtered[df_filtered["SN"] == selected_pop_sn].iloc[0]
-                    show_photo_popup(
-                        sn=row_target["SN"],
-                        model=row_target["Model"],
-                        tipe=row_target["Tipe"],
-                        user=row_target["User"],
-                        site=row_target["Site"],
-                        drive_url=row_target["Link Foto Asset"]
-                    )
-                else:
-                    st.warning("Pilih SN Aset terlebih dahulu.")
-
+        col_ex1, col_ex2, col_ex_empty = st.columns([0.2, 0.25, 1])
         with col_ex1:
-            st.write(" ")
-            st.write(" ")
             csv_data = df_filtered.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Export CSV", csv_data, "export_it_asset.csv", "text/csv")
-            
         with col_ex2:
-            st.write(" ")
-            st.write(" ")
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_filtered.to_excel(writer, index=False, sheet_name='IT_Assets')
