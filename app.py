@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import io
-import re
 from datetime import datetime
 from database import (
     load_data, load_logs, save_data, add_log, 
@@ -11,34 +10,6 @@ from ai_assistant import render_ai_assistant
 
 # Konfigurasi Halaman Web
 st.set_page_config(page_title="IT Asset Management", page_icon="💻", layout="wide")
-
-# Fungsi Konversi URL Google Drive ke URL Embed Preview
-def get_gdrive_embed_url(url):
-    if not url or str(url).strip().lower() in ['nan', 'none', '']:
-        return None
-    url = str(url).strip()
-    match = re.search(r'(?:file/d/|id=|/d/)([a-zA-Z0-9_-]+)', url)
-    if match:
-        file_id = match.group(1)
-        return f"https://drive.google.com/file/d/{file_id}/preview"
-    return url
-
-# POP-UP DIALOG UNTUK PREVIEW FOTO GOOGLE DRIVE
-@st.dialog("🖼️ Preview Foto Asset")
-def show_photo_popup(sn, model, tipe, user, site, drive_url):
-    st.markdown(f"**SN:** `{sn}` | **Perangkat:** {tipe} {model}")
-    st.markdown(f"**Pengguna:** {user} | **Lokasi Site:** {site}")
-    st.markdown("---")
-    
-    embed_url = get_gdrive_embed_url(drive_url)
-    if embed_url:
-        st.markdown(
-            f'<iframe src="{embed_url}" width="100%" height="420" style="border:none; border-radius:10px;"></iframe>', 
-            unsafe_allow_html=True
-        )
-        st.markdown(f"🔗 [Buka Foto di Google Drive / Tab Baru]({drive_url})")
-    else:
-        st.warning("⚠️ Belum ada tautan/link foto Google Drive yang valid untuk aset ini.")
 
 # Muat Data Utama
 df_asset = load_data()
@@ -71,7 +42,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📜 Log History"
 ])
 
-# TAB 1: LIHAT, SORT, & FILTER DATA (DENGAN REFRESH CENTANG AMAN)
+# TAB 1: LIHAT, SORT, & FILTER DATA
 with tab1:
     st.subheader("Daftar Aset Terdaftar")
     
@@ -133,63 +104,23 @@ with tab1:
 
     st.caption(f"Menampilkan **{len(df_filtered)}** dari total **{len(df_asset)}** aset.")
     
-    # Inisialisasi Key Editor untuk Reset Centang Otomatis
-    if "editor_key" not in st.session_state:
-        st.session_state.editor_key = 0
-
-    # Menyiapkan Tampilan Data Editor
-    df_display = df_filtered.copy()
-    df_display.insert(0, "Preview Foto", False)
-
-    editor_key = f"editor_table_{st.session_state.editor_key}"
-
-    edited_df = st.data_editor(
-        df_display, 
+    # Menampilkan Dataframe Utama dengan Link Buka Foto
+    st.dataframe(
+        df_filtered, 
         use_container_width=True, 
         hide_index=True,
-        disabled=[col for col in COLUMNS],
         column_config={
-            "Preview Foto": st.column_config.CheckboxColumn(
-                "🖼️ Preview Foto",
-                help="Centang untuk membuka Pop-Up Foto Aset!",
-                default=False
-            ),
             "Link Foto Asset": st.column_config.LinkColumn(
                 "Link Foto Asset (Google Drive)",
-                display_text="🔗 Buka Link GD",
+                display_text="🔗 Buka Link Foto",
                 help="Klik untuk membuka langsung di Google Drive"
             ),
             "Purchase Date": st.column_config.DateColumn(
                 "Purchase Date",
                 format="YYYY-MM-DD"
             )
-        },
-        key=editor_key
+        }
     )
-    
-    # PERBAIKAN: Tangkap HANYA 1 Centang Terakhir & Reset State untuk Mencegah Error
-    if editor_key in st.session_state and "edited_rows" in st.session_state[editor_key]:
-        edited_rows = st.session_state[editor_key]["edited_rows"]
-        selected_target_row = None
-        
-        # Cari baris terakhir yang dicentang True
-        for row_idx, changes in edited_rows.items():
-            if changes.get("Preview Foto") == True:
-                selected_target_row = row_idx
-        
-        if selected_target_row is not None and selected_target_row < len(df_filtered):
-            row_target = df_filtered.iloc[selected_target_row]
-            # Tingkatkan Key Editor untuk Reset Centang
-            st.session_state.editor_key += 1
-            # Buka Pop-up Foto
-            show_photo_popup(
-                sn=row_target["SN"],
-                model=row_target["Model"],
-                tipe=row_target["Tipe"],
-                user=row_target["User"],
-                site=row_target["Site"],
-                drive_url=row_target["Link Foto Asset"]
-            )
 
     # --- TOMBOL EXPORT (CSV & EXCEL BERDEKATAN) ---
     if not df_filtered.empty:
