@@ -333,16 +333,16 @@ with tab6:
     else:
         st.info("Belum ada riwayat aktivitas.")
 
-# TAB 7: PLOTTING TAGIHAN SIMCARD (DENGAN PEMETAAN KOLOM AKURAT)
+# TAB 7: PLOTTING TAGIHAN SIMCARD (DENGAN REVERSE PULLING SN DEVICE)
 with tab7:
     st.subheader("📱 Auto-Plotting Tagihan SIM Card")
     st.caption("Pencocokan presisi antara Tagihan Telkom, Data User Terbaru Bulan Ini, & Data Historis.")
     
     col_u1, col_u2, col_u3 = st.columns(3)
     with col_u1:
-        file_telkom = st.file_uploader("1. File Tagihan Telkom (.xlsx/.csv)", type=["xlsx", "csv"], key="u3_telkom")
+        file_telkom = st.file_uploader("1. File Tagihan Telkom (MSISDN & TAGIHAN)", type=["xlsx", "csv"], key="u3_telkom")
     with col_u2:
-        file_active_users = st.file_uploader("2. File Update User Terbaru Bulan Ini (.xlsx/.csv)", type=["xlsx", "csv"], key="u3_users")
+        file_active_users = st.file_uploader("2. File Update User Terbaru Bulan Ini", type=["xlsx", "csv"], key="u3_users")
     with col_u3:
         file_historis = st.file_uploader("3. File Historis Bulan Lalu (Opsional)", type=["xlsx", "csv"], key="u3_historis")
         
@@ -368,14 +368,12 @@ with tab7:
             tel_cols = ["-- Pilih Kolom --"] + list(df_tel.columns)
             col_t1, col_t2 = st.columns(2)
             
-            # Cari default MSISDN
             def_msisdn = 0
             for i, c in enumerate(tel_cols):
                 if "MSISDN" in c.upper():
                     def_msisdn = i
                     break
             
-            # Cari default TAGIHAN
             def_tagihan = 0
             for i, c in enumerate(tel_cols):
                 if "TAGIHAN" in c.upper() or "BILL" in c.upper():
@@ -393,7 +391,6 @@ with tab7:
                 st.markdown("##### 👤 Pemetaan Kolom File User Aktif Bulan Ini:")
                 usr_cols = ["-- Pilih / Tidak Ada --"] + list(df_users.columns)
                 
-                # Fungsi pembantu index default
                 def get_idx(col_name_part):
                     for idx, col in enumerate(usr_cols):
                         if col_name_part.upper() in col.upper():
@@ -414,7 +411,7 @@ with tab7:
                 with cu6:
                     col_u_asp = st.selectbox("Kolom Nama ASP:", usr_cols, index=get_idx("ASP"))
 
-            # FUNGSI NORMATISASI NOMOR TELEPON
+            # FUNGSI NORMALISASI NOMOR TELEPON
             def normalize_phone(val):
                 cleaned = re.sub(r'\D', '', str(val))
                 if cleaned.startswith("62"):
@@ -477,37 +474,59 @@ with tab7:
                             mobil_code_val = str(u_target.get(col_u_mobil, "")).strip() if col_u_mobil != "-- Pilih / Tidak Ada --" else ""
                             mobil_val = da_code_val if da_code_val != "" else (mobil_code_val if mobil_code_val != "" else "-")
                             
-                            # SN DEVICE
+                            # SN DEVICE (Langkah 1: Langsung dari baris terploting)
                             if col_u_sn != "-- Pilih / Tidak Ada --":
-                                sn_val = str(u_target.get(col_u_sn, "-"))
-                                
+                                sn_val = str(u_target.get(col_u_sn, "-")).strip()
+                                if sn_val == "" or sn_val.lower() in ["nan", "none"]:
+                                    sn_val = "-"
+                                    
                             ket_status = "AKTIF" if user_val not in ["-", ""] else "TIDAK AKTIF"
-                        else:
-                            # B. CEK KE DATABASE ITAM INTERNAL (FALLBACK 1)
+
+                        # LOGIKA PERBAIKAN SN DEVICE (Langkah 2: Cross-check SN di File User Aktif berdasarkan DA / No Mobil)
+                        if sn_val == "-" and not df_users.empty and mobil_val not in ["-", ""]:
+                            # Cari baris di File User Aktif yang memiliki DA / No Mobil yang sama dan memiliki SN
+                            match_sn_by_mobil = pd.DataFrame()
+                            if col_u_da != "-- Pilih / Tidak Ada --":
+                                match_sn_by_mobil = df_users[df_users[col_u_da].astype(str).str.strip() == mobil_val]
+                            if match_sn_by_mobil.empty and col_u_mobil != "-- Pilih / Tidak Ada --":
+                                match_sn_by_mobil = df_users[df_users[col_u_mobil].astype(str).str.strip() == mobil_val]
+                                
+                            if not match_sn_by_mobil.empty and col_u_sn != "-- Pilih / Tidak Ada --":
+                                for _, row_sn in match_sn_by_mobil.iterrows():
+                                    cand_sn = str(row_sn.get(col_u_sn, "")).strip()
+                                    if cand_sn not in ["", "-", "nan", "None"]:
+                                        sn_val = cand_sn
+                                        break
+
+                        # LOGIKA PERBAIKAN SN DEVICE (Langkah 3: Fallback ke Database ITAM Internal berdasarkan SIM / DA / User)
+                        if sn_val == "-":
                             match_db = pd.DataFrame()
                             if sim_clean != "":
                                 match_db = df_db_clean[df_db_clean["SIM_clean"] == sim_clean]
+                            if match_db.empty and mobil_val not in ["-", ""]:
+                                match_db = df_db_clean[df_db_clean["No Mobil"].astype(str).str.strip() == mobil_val]
+                            if match_db.empty and user_val not in ["-", ""]:
+                                match_db = df_db_clean[df_db_clean["User"].astype(str).str.strip() == user_val]
 
                             if not match_db.empty:
                                 target_db = match_db.iloc[0]
-                                depo_val = str(target_db.get("Site", "-"))
-                                user_val = str(target_db.get("User", "-"))
-                                mobil_val = str(target_db.get("No Mobil", "-"))
+                                if depo_val == "-": depo_val = str(target_db.get("Site", "-"))
+                                if user_val == "-": user_val = str(target_db.get("User", "-"))
+                                if mobil_val == "-": mobil_val = str(target_db.get("No Mobil", "-"))
                                 sn_val = str(target_db.get("SN", "-"))
-                                ket_status = "AKTIF" if user_val not in ["-", ""] else "TIDAK AKTIF"
-                            else:
-                                # C. CEK KE FILE HISTORIS BULAN LALU (FALLBACK 2)
-                                match_hist = pd.DataFrame()
-                                if not df_hist.empty and sim_clean != "" and "SIM_clean" in df_hist.columns:
-                                    match_hist = df_hist[df_hist["SIM_clean"] == sim_clean]
+                                if user_val not in ["-", ""]:
+                                    ket_status = "AKTIF"
 
-                                if not match_hist.empty:
-                                    target_h = match_hist.iloc[0]
-                                    depo_val = str(target_h.get("DEPO", "-"))
-                                    user_val = str(target_h.get("NAMA USER", "-"))
-                                    mobil_val = str(target_h.get("KODE DA/NO MOBIL", "-"))
-                                    sn_val = str(target_h.get("SN DEVICE", "-"))
-                                    ket_status = "AKTIF" if user_val not in ["-", ""] else "TIDAK AKTIF"
+                        # FALLBACK B: CEK KE FILE HISTORIS
+                        if user_val == "-" and not df_hist.empty and sim_clean != "" and "SIM_clean" in df_hist.columns:
+                            match_hist = df_hist[df_hist["SIM_clean"] == sim_clean]
+                            if not match_hist.empty:
+                                target_h = match_hist.iloc[0]
+                                depo_val = str(target_h.get("DEPO", "-"))
+                                user_val = str(target_h.get("NAMA USER", "-"))
+                                mobil_val = str(target_h.get("KODE DA/NO MOBIL", "-"))
+                                if sn_val == "-": sn_val = str(target_h.get("SN DEVICE", "-"))
+                                ket_status = "AKTIF" if user_val not in ["-", ""] else "TIDAK AKTIF"
 
                         results.append({
                             "DEPO": depo_val,
@@ -520,7 +539,7 @@ with tab7:
                         })
 
                     st.session_state["plotting_result"] = pd.DataFrame(results)
-                    st.success("🎉 **Auto-Plotting Selesai!**")
+                    st.success("🎉 **Auto-Plotting Selesai!** Data SN Device berhasil ditarik.")
 
             # TABEL HASIL AKHIR & EXPORT
             if "plotting_result" in st.session_state:
