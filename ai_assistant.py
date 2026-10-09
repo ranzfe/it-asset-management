@@ -3,60 +3,64 @@ import pandas as pd
 from database import load_data, load_logs
 
 def render_ai_assistant():
-    # CSS Khusus untuk Mengatur Posisi Tombol Melayang (Pojok Kiri Bawah) & Tampilan Popover Popup Chat
+    # CSS Khusus untuk Memaksa Tombol & Popup Mengapung Selalu di Pojok Kiri Bawah
     st.markdown(
         """
         <style>
-        /* Mengunci posisi tombol popover melayang di Pojok Kiri Bawah */
+        /* Mengubah container popover menjadi Floating Overlay Fixed di Pojok Kiri Bawah */
         div[data-testid="stPopover"] {
             position: fixed !important;
-            bottom: 30px !important;
-            left: 30px !important;
-            z-index: 999999 !important;
+            bottom: 25px !important;
+            left: 25px !important;
+            z-index: 9999999 !important;
         }
 
-        /* Styling Tombol Bulat Melayang 🤖 */
+        /* Desain Tombol Bulat Melayang warna Ungu dengan Ikon Robot 🤖 */
         div[data-testid="stPopover"] > button {
-            width: 65px !important;
-            height: 65px !important;
+            width: 60px !important;
+            height: 60px !important;
             border-radius: 50% !important;
             background: linear-gradient(135deg, #7C5CFF 0%, #5E35B1 100%) !important;
             color: white !important;
-            border: none !important;
-            box-shadow: 0 6px 18px rgba(124, 92, 255, 0.5) !important;
-            font-size: 32px !important;
+            border: 2px solid #ffffff33 !important;
+            box-shadow: 0 8px 20px rgba(124, 92, 255, 0.6) !important;
+            font-size: 30px !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
             cursor: pointer !important;
-            transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
             padding: 0 !important;
+            margin: 0 !important;
         }
 
         div[data-testid="stPopover"] > button:hover {
-            transform: scale(1.1) !important;
-            box-shadow: 0 8px 25px rgba(124, 92, 255, 0.7) !important;
+            transform: scale(1.12) rotate(5deg) !important;
+            box-shadow: 0 10px 28px rgba(124, 92, 255, 0.8) !important;
+            background: linear-gradient(135deg, #8A6CFF 0%, #6A3DE8 100%) !important;
         }
 
-        /* Styling Jendela Popover Chat (Mirip Gambar Widget Pop-up) */
+        /* Container Jendela Chat AI */
         div[data-testid="stPopoverBody"] {
             width: 380px !important;
             max-width: 90vw !important;
-            border-radius: 18px !important;
+            border-radius: 16px !important;
             background-color: #12141D !important;
             border: 1px solid #7C5CFF !important;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6) !important;
             padding: 16px !important;
+            position: fixed !important;
+            bottom: 95px !important;
+            left: 25px !important;
         }
 
-        /* Kustomisasi Header Jendela AI */
-        .ai-header {
-            background: linear-gradient(90deg, #7C5CFF 0%, #6200EA 100%);
-            padding: 12px 16px;
-            border-radius: 12px;
+        .ai-title-bar {
+            background: linear-gradient(90deg, #7C5CFF 0%, #5E35B1 100%);
+            padding: 10px 14px;
+            border-radius: 10px;
             color: white;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 15px;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -67,13 +71,12 @@ def render_ai_assistant():
         unsafe_allow_html=True
     )
 
-    # Popover Tombol Floating 🤖
+    # Menampilkan Popover Floating Button
     with st.popover("🤖", help="Buka AI Assistant"):
-        st.markdown('<div class="ai-header">🤖 <span>ITAM AI Assistant</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-title-bar">🤖 <span>ITAM AI Assistant</span></div>', unsafe_allow_html=True)
         st.caption("Tanyakan Serial Number (SN), Nama User, atau detail aset IT di sini.")
         
-        # Container pesan chat internal
-        chat_container = st.container(height=300)
+        chat_container = st.container(height=320)
         
         if "ai_messages" not in st.session_state:
             st.session_state.ai_messages = [
