@@ -333,7 +333,7 @@ with tab6:
     else:
         st.info("Belum ada riwayat aktivitas.")
 
-# TAB 7: PLOTTING TAGIHAN SIMCARD (LOGIKA AGRESIF DEEP MATCHING SN)
+# TAB 7: PLOTTING TAGIHAN SIMCARD (DENGAN SORTING & FILTER RAPI)
 with tab7:
     st.subheader("📱 Auto-Plotting Tagihan SIM Card")
     st.caption("Alur Kerja: Tagihan Telkom ➔ Cek Historis (Dapatkan Kode DA/No Mobil) ➔ Validasi Keaktifan & Deep Search SN Device dari Update Bulan Ini.")
@@ -508,17 +508,16 @@ with tab7:
                                 if new_da not in ["", "-", "nan", "None"]:
                                     mobil_val = new_da
 
-                                # PERBAIKAN UTAMA: TARIK SN DARI BARIS MATCH LEBIH DAHULU
+                                # Tarik SN dari baris match
                                 if col_u_sn != "-- Pilih / Tidak Ada --":
                                     c_sn = str(u_row.get(col_u_sn, "")).strip()
                                     if c_sn not in ["", "-", "nan", "None"]:
                                         sn_val = c_sn
 
-                        # PERBAIKAN LOGIKA AGRESIF: DEEP SEARCH SN DEVICE BERDASARKAN KODE DA PADA SELURUH FILE USER AKTIF
+                        # DEEP SEARCH SN DEVICE BERDASARKAN KODE DA PADA SELURUH FILE USER AKTIF
                         if (sn_val in ["-", "", "nan", "None"]) and not df_users.empty and mobil_val not in ["-", ""]:
                             target_da_clean = mobil_val.strip().upper()
                             
-                            # Scan di kolom DA atau seluruh kolom jika cocok dengan DA
                             matches_da_all = pd.DataFrame()
                             if col_u_da != "-- Pilih / Tidak Ada --":
                                 matches_da_all = df_users[df_users[col_u_da].astype(str).str.strip().str.upper() == target_da_clean]
@@ -531,7 +530,6 @@ with tab7:
                                         matches_da_all = m
                                         break
                             
-                            # Ekstrak SN dari hasil match DA yang sel SN nya tidak kosong
                             if not matches_da_all.empty:
                                 sn_col_target = col_u_sn if col_u_sn != "-- Pilih / Tidak Ada --" else "SN"
                                 if sn_col_target in matches_da_all.columns:
@@ -567,29 +565,74 @@ with tab7:
                         })
 
                     st.session_state["plotting_result"] = pd.DataFrame(results)
-                    st.success("🎉 **Auto-Plotting Selesai!** Data SN Device berhasil ditarik secara presisi.")
+                    st.success("🎉 **Auto-Plotting Selesai!** Data berhasil ditarik.")
 
-            # TABEL HASIL AKHIR & EXPORT
-            if "plotting_result" in st.session_state:
+            # FITUR SORTING, FILTER, & RINGKASAN REKAPITULASI
+            if "plotting_result" in st.session_state and not st.session_state["plotting_result"].empty:
+                df_res = st.session_state["plotting_result"].copy()
+
                 st.markdown("---")
-                st.markdown("##### ✏️ Hasil Plotting Akhir:")
-                st.caption("Status `AKTIF` jika Kode DA/No Mobil terdaftar di File Update Bulan Ini, dan `TIDAK AKTIF` jika tidak terdaftar lagi.")
+                st.markdown("##### 🎛️ Panel Pengurutan (Sort) & Filter Hasil Plotting:")
+                
+                col_s1, col_s2, col_f1, col_f2 = st.columns([1.5, 1, 1.2, 1.2])
+                with col_s1:
+                    sort_col_plot = st.selectbox("Urutkan Berdasarkan:", ["DEPO", "NAMA USER", "KETERANGAN", "KODE DA/NO MOBIL", "TAGIHAN", "SN DEVICE"], index=0)
+                with col_s2:
+                    sort_order_plot = st.radio("Urutan Sort:", ["A-Z (Asc)", "Z-A (Desc)"], key="plot_sort_order")
+                with col_f1:
+                    depo_options = ["Semua Depo"] + sorted([d for d in df_res["DEPO"].unique() if d not in ["-", ""]])
+                    filter_depo = st.selectbox("Filter Depo:", depo_options)
+                with col_f2:
+                    filter_ket = st.selectbox("Filter Keterangan:", ["Semua Status", "AKTIF", "TIDAK AKTIF"])
+
+                # PROSES FILTER
+                if filter_depo != "Semua Depo":
+                    df_res = df_res[df_res["DEPO"] == filter_depo]
+                if filter_ket != "Semua Status":
+                    df_res = df_res[df_res["KETERANGAN"] == filter_ket]
+
+                # PROSES SORTING
+                asc_flag = True if sort_order_plot == "A-Z (Asc)" else False
+                if sort_col_plot == "TAGIHAN":
+                    # Convert ke numerik untuk sorting angka tagihan yang benar
+                    df_res["_tagihan_num"] = pd.to_numeric(df_res["TAGIHAN"].str.replace(r'\D', '', regex=True), errors='coerce').fillna(0)
+                    df_res = df_res.sort_values(by="_tagihan_num", ascending=asc_flag).drop(columns=["_tagihan_num"])
+                else:
+                    df_res = df_res.sort_values(by=sort_col_plot, ascending=asc_flag)
+
+                # METRICS RINGKASAN
+                st.markdown("---")
+                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                tot_items = len(df_res)
+                tot_aktif = len(df_res[df_res["KETERANGAN"] == "AKTIF"])
+                tot_no_aktif = len(df_res[df_res["KETERANGAN"] == "TIDAK AKTIF"])
+                
+                # Hitung Total Rp Tagihan
+                tagihan_sum = pd.to_numeric(df_res["TAGIHAN"].astype(str).str.replace(r'\D', '', regex=True), errors='coerce').fillna(0).sum()
+
+                col_m1.metric("Total SIM Card", tot_items)
+                col_m2.metric("Nomor AKTIF", tot_aktif)
+                col_m3.metric("Nomor TIDAK AKTIF", tot_no_aktif)
+                col_m4.metric("Total Tagihan (Rp)", f"Rp {tagihan_sum:,.0f}")
+
+                st.markdown("##### ✏️ Tabel Hasil Plotting Final (Siap Export):")
+                st.caption("Data di bawah sudah terurut dengan rapi. Anda dapat mengedit sel secara manual sebelum mengunduh file Excel.")
 
                 edited_plotting = st.data_editor(
-                    st.session_state["plotting_result"],
+                    df_res,
                     use_container_width=True,
                     hide_index=True,
                     num_rows="dynamic"
                 )
 
-                # EXPORT HASIL AKHIR EXCEL
+                # EXPORT HASIL AKHIR EXCEL (DENGAN URUTAN TERBARU)
                 output_plot = io.BytesIO()
                 with pd.ExcelWriter(output_plot, engine='openpyxl') as writer:
                     edited_plotting.to_excel(writer, index=False, sheet_name='Hasil_Plotting')
                 excel_plot_data = output_plot.getvalue()
 
                 st.download_button(
-                    "📊 Export Hasil Plotting ke Excel (.xlsx)", 
+                    "📊 Export Hasil Plotting Rapi ke Excel (.xlsx)", 
                     excel_plot_data, 
                     "hasil_plotting_tagihan_telkom.xlsx", 
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
