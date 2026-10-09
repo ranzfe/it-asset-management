@@ -41,8 +41,13 @@ def render_ai_assistant():
                     response += f"- **Tipe/Model:** {row['Tipe']} {row['Model']}\n"
                     response += f"- **User:** {row['User']} (NIK: {row['NIK']})\n"
                     response += f"- **Status:** `{row['Status']}` | **Site:** {row['Site']} ({row['Kd Site']})\n"
-                    response += f"- **Ket Wilayah:** {row['Ket Wilayah']}\n"
-                    if row['Keterangan']:
+                    
+                    # Cek dan Tampilkan Link Foto jika ada
+                    link_foto = str(row.get('Link Foto Asset', '')).strip()
+                    if link_foto and link_foto.lower() != 'nan':
+                        response += f"- **Link Foto:** [🖼️ Lihat Foto Google Drive]({link_foto})\n"
+                        
+                    if row.get('Keterangan'):
                         response += f"- **Keterangan:** {row['Keterangan']}\n"
                     response += "---\n"
                 
