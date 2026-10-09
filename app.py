@@ -249,4 +249,69 @@ with tab4:
                                         df_current.at[match_idx, col] = val_baru
                                         perubahans.append(f"{col}: '{val_lama}' ➔ '{val_baru}'")
                                 if perubahans:
-                                    count_update +=
+                                    count_update += 1
+                                    add_log("UPDATE (via Upload)", row["SN"], row["User"], "; ".join(perubahans))
+                            else:
+                                df_current = pd.concat([df_current, pd.DataFrame([row[COLUMNS].to_dict()])], ignore_index=True)
+                                count_baru += 1
+                                add_log("TAMBAH BARU (via Upload)", row["SN"], row["User"], f"Aset baru ditambahkan.")
+                    
+                    df_current = df_current.drop(columns=["SN_clean"], errors='ignore')
+                    save_data(df_current[COLUMNS])
+                    st.success(f"🎉 **PROSES UPLOAD SELESAI!**\n- ✅ **{count_baru} Data Baru**\n- 🔄 **{count_update} Data Diperbarui**")
+                    st.balloons()
+                else:
+                    df_upload = df_upload.drop(columns=["SN_clean"], errors='ignore')
+                    save_data(df_upload[COLUMNS])
+                    st.success(f"🎉 **UPLOAD PERDANA SELESAI!** Tersimpan {len(df_upload)} data.")
+                    st.balloons()
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+
+# TAB 5: TAMBAH MANUAL
+with tab5:
+    st.subheader("Form Tambah Aset Manual")
+    with st.form("form_tambah_aset", clear_on_submit=True):
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            ket_wilayah = st.text_input("Ket Wilayah")
+            sn = st.text_input("SN")
+            tipe = st.text_input("Tipe")
+            model = st.text_input("Model")
+            status_beli = st.text_input("Status Beli")
+        with col_b:
+            asal_po = st.text_input("Asal PO")
+            status = st.selectbox("Status", STATUS_OPTIONS)
+            nik = st.text_input("NIK")
+            user = st.text_input("User")
+            kd_site = st.text_input("Kd Site")
+        with col_c:
+            site = st.text_input("Site")
+            no_mobil = st.text_input("No Mobil")
+            sim_card = st.text_input("SIM Card")
+            imei = st.text_input("Imei")
+            keterangan = st.text_area("Keterangan")
+            
+        if st.form_submit_button("Simpan Aset"):
+            new_data = {
+                "Ket Wilayah": ket_wilayah, "SN": sn, "Tipe": tipe, "Model": model,
+                "Status Beli": status_beli, "Status": status, "NIK": nik, "User": user,
+                "Kd Site": kd_site, "Site": site, "No Mobil": no_mobil, "SIM Card": sim_card,
+                "Imei": imei, "Keterangan": keterangan
+            }
+            save_data(pd.concat([df_asset, pd.DataFrame([new_data])], ignore_index=True))
+            add_log("TAMBAH BARU (Manual)", sn, user, f"Tambah manual Aset {tipe} {model}")
+            st.success(f"✅ **SELESAI!** Aset SN `{sn}` tersimpan.")
+
+# TAB 6: LOG HISTORY
+with tab6:
+    st.subheader("📜 Riwayat & Log Perubahan Data Aset")
+    df_logs = load_logs()
+    if not df_logs.empty:
+        search_log = st.text_input("🔍 Cari di Log History:", "")
+        if search_log:
+            mask_log = df_logs.apply(lambda row: row.astype(str).str.contains(search_log, case=False).any(), axis=1)
+            df_logs = df_logs[mask_log]
+        st.dataframe(df_logs, use_container_width=True, hide_index=True)
+    else:
+        st.info("Belum ada riwayat aktivitas.")
