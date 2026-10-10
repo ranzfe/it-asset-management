@@ -41,9 +41,6 @@ def load_data():
     if os.path.exists(DATA_FILE):
         try:
             df = pd.read_csv(DATA_FILE, dtype=str).fillna("")
-            for col in COLUMNS:
-                if col not in df.columns:
-                    df[col] = ""
             return df
         except Exception:
             return pd.DataFrame(columns=COLUMNS)
@@ -51,10 +48,30 @@ def load_data():
 
 def save_data(df):
     df_clean = df.fillna("").astype(str)
+    
+    # Normalisasi Pemetaan Kolom Otomatis
+    col_map = {}
+    for col in df_clean.columns:
+        c_upper = col.strip().upper()
+        if c_upper in ["KET SITE", "DEPO", "LOKASI"]:
+            col_map[col] = "Site"
+        elif c_upper in ["DA", "KODE DA", "KODE DA/NO MOBIL"]:
+            col_map[col] = "No Mobil"
+        elif c_upper in ["NAMA DA", "NAMA USER", "NAMA ASP"]:
+            col_map[col] = "User"
+        elif c_upper in ["SIM", "NOMOR SIM", "MSISDN"]:
+            col_map[col] = "SIM Card"
+            
+    if col_map:
+        for old_c, new_c in col_map.items():
+            if new_c not in df_clean.columns or df_clean[new_c].str.strip().eq("").all():
+                df_clean[new_c] = df_clean[old_c]
+
     # Pastikan kolom standar ada
     for col in COLUMNS:
         if col not in df_clean.columns:
             df_clean[col] = ""
+            
     df_clean.to_csv(DATA_FILE, index=False)
     commit_to_github(DATA_FILE, f"Auto-update asset data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
