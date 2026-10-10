@@ -22,32 +22,43 @@ df_asset = load_data()
 # PIN RAHASIA ADMIN (Silakan ubah '1234' sesuai keinginan Anda)
 ADMIN_PIN = "1234"
 
+# Inisialisasi Session State Login Admin
+if "admin_logged_in" not in st.session_state:
+    st.session_state["admin_logged_in"] = False
+
 # --- SIDEBAR ACCESS CONTROL ---
-st.sidebar.title("🔐 Akses System")
-user_role = st.sidebar.radio("Pilih Hak Akses:", ["PIC / User Field (Hanya Mutasi)", "Admin / IT EDP"])
+st.sidebar.title("🔐 Login Administrator")
 
-is_admin = False
-
-if user_role == "Admin / IT EDP":
-    pin_input = st.sidebar.text_input("Masukkan PIN Admin / EDP:", type="password")
-    if pin_input == ADMIN_PIN:
-        is_admin = True
-        st.sidebar.success("🔑 Akses Admin Terverifikasi!")
-    else:
-        if pin_input != "":
+if not st.session_state["admin_logged_in"]:
+    st.sidebar.info("💡 Mode PIC (Akses Terbatas: Hanya Form Mutasi)")
+    pin_input = st.sidebar.text_input("Masukkan PIN Admin / EDP:", type="password", key="login_pin_input")
+    
+    if st.sidebar.button("🔓 Login Admin"):
+        if pin_input == ADMIN_PIN:
+            st.session_state["admin_logged_in"] = True
+            st.sidebar.success("🔑 Login Berhasil!")
+            st.rerun()
+        else:
             st.sidebar.error("❌ PIN Salah!")
-        st.sidebar.warning("🔒 Masukkan PIN yang benar untuk mengakses menu Admin.")
+else:
+    st.sidebar.success("✅ Terverifikasi sebagai Admin / IT EDP")
+    if st.sidebar.button("🔒 Keluar Mode Admin"):
+        st.session_state["admin_logged_in"] = False
+        st.rerun()
 
-if not is_admin:
-    # --- TAMPILAN DEFALUT UNTUK PIC / USER FIELD (HANYA FORM MUTASI) ---
-    st.title("💻 IT Asset Management System - Form Mutasi")
-    st.info("💡 Mode PIC: Anda hanya diizinkan mengakses Form Mutasi Aset.")
+st.sidebar.markdown("---")
+
+# --- TAMPILAN SESUAI HAK AKSES ---
+if not st.session_state["admin_logged_in"]:
+    # Mode PIC / User Field (Hanya Form Mutasi)
+    st.title("💻 IT Asset Management - Form Mutasi Aset")
+    st.info("💡 Anda berada di Mode PIC (Hanya Pengisian Mutasi Aset). Masukkan PIN Admin di sidebar untuk membuka semua menu.")
     st.markdown("---")
     render_tab9(df_asset)
 
 else:
-    # --- TAMPILAN FULL UNTUK ADMIN / IT EDP ---
-    st.title("💻 IT Asset Management System")
+    # Mode Full Admin / IT EDP
+    st.title("💻 IT Asset Management System (Admin Mode)")
     st.markdown("---")
 
     col1, col2, col3, col4, col5 = st.columns(5)
@@ -64,7 +75,7 @@ else:
     col5.metric("Jual", jual_count)
     st.markdown("---")
 
-    # --- TAB MENU UTAMA ADMIN ---
+    # Tab Menu Utama Admin
     tab1, tab2, tab9, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
         "📋 Daftar, Sort & Filter Aset", 
         "📄 Serah Terima Hardware (BAST)",
