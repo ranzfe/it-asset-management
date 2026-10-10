@@ -9,21 +9,23 @@ def render_tab9(df_asset):
 
     list_sn = sorted([sn for sn in df_asset["SN"].unique() if str(sn).strip() != ""])
     
-    with st.form("form_mutasi_asset", clear_on_submit=False):
-        st.markdown("##### 1. Pilih Aset yang Akan Dimutasi")
-        selected_sn_mutasi = st.selectbox("Pilih Serial Number (SN) Aset Saat Ini:", ["-- Pilih SN --"] + list_sn)
-        
-        # Auto-pull data AS IS dari database
-        as_is_depo = as_is_da = as_is_nama = as_is_sim = as_is_nik = ""
-        if selected_sn_mutasi != "-- Pilih SN --":
-            r_curr = df_asset[df_asset["SN"] == selected_sn_mutasi].iloc[0]
-            as_is_depo = str(r_curr.get("Site", ""))
-            as_is_da = str(r_curr.get("No Mobil", ""))
-            as_is_nama = str(r_curr.get("User", ""))
-            as_is_sim = str(r_curr.get("SIM Card", ""))
-            as_is_nik = str(r_curr.get("NIK", ""))
+    # PILIH SN DI LUAR FORM AGAR DATA AS IS LANGSUNG DITARIK REA-TIME
+    st.markdown("##### 1. Pilih Aset yang Akan Dimutasi")
+    selected_sn_mutasi = st.selectbox("Pilih Serial Number (SN) Aset Saat Ini:", ["-- Pilih SN --"] + list_sn, key="sel_sn_mutasi_ext")
+    
+    # Auto-pull data AS IS dari database
+    as_is_depo = as_is_da = as_is_nama = as_is_sim = as_is_nik = ""
+    if selected_sn_mutasi != "-- Pilih SN --":
+        r_curr = df_asset[df_asset["SN"] == selected_sn_mutasi].iloc[0]
+        as_is_depo = str(r_curr.get("Site", ""))
+        as_is_da = str(r_curr.get("No Mobil", ""))
+        as_is_nama = str(r_curr.get("User", ""))
+        as_is_sim = str(r_curr.get("SIM Card", ""))
+        as_is_nik = str(r_curr.get("NIK", ""))
 
-        st.markdown("---")
+    st.markdown("---")
+    
+    with st.form("form_mutasi_asset", clear_on_submit=False):
         col_asis, col_tobe = st.columns(2)
         
         # TAMPILAN DATA AS IS (KONDISI SEBELUMNYA)
@@ -42,7 +44,7 @@ def render_tab9(df_asset):
             to_be_depo = st.text_input("Depo Baru (TO BE):", value=as_is_depo, key="m_to_depo")
             to_be_da = st.text_input("Kode DA / ASP Baru (TO BE):", value=as_is_da, key="m_to_da")
             to_be_nama = st.text_input("Nama User / DA / ASP Baru (TO BE):", value="", key="m_to_nama")
-            to_be_sn = st.text_input("SN Device Baru (Isi jika Tukar Unit):", value=selected_sn_mutasi, key="m_to_sn")
+            to_be_sn = st.selectbox("SN Device Baru (Isi jika Tukar Unit):", [selected_sn_mutasi] + [sn for sn in list_sn if sn != selected_sn_mutasi], key="m_to_sn")
             to_be_sim = st.text_input("No SIM Card Baru (TO BE):", value=as_is_sim, key="m_to_sim")
             to_be_nik = st.text_input("Employee NIK Baru (TO BE):", value="", key="m_to_nik")
 
@@ -63,7 +65,6 @@ def render_tab9(df_asset):
             else:
                 df_curr = load_data()
                 
-                # Update data aset pada database utama
                 idx_target = df_curr[df_curr["SN"] == selected_sn_mutasi].index
                 if not idx_target.empty:
                     df_curr.loc[idx_target, "User"] = to_be_nama
@@ -71,9 +72,8 @@ def render_tab9(df_asset):
                     df_curr.loc[idx_target, "No Mobil"] = to_be_da
                     df_curr.loc[idx_target, "SIM Card"] = to_be_sim
                     df_curr.loc[idx_target, "NIK"] = to_be_nik
-                    df_curr.loc[idx_target, "SN"] = to_be_sn  # Update SN baru jika ada tukar unit
+                    df_curr.loc[idx_target, "SN"] = to_be_sn
                     
-                    # Tambahkan Catatan Log Detail Mutasi (Format AS IS ➔ TO BE)
                     log_detail = f"MUTASI [{ket_mutasi}]: ({as_is_depo} | {as_is_da} | {as_is_nama}) ➔ ({to_be_depo} | {to_be_da} | {to_be_nama}). {catatan_tambahan}"
                     add_log("MUTASI ASET", to_be_sn, to_be_nama, log_detail)
                     
