@@ -22,20 +22,23 @@ def render_tab9(df_asset):
         st.warning("⚠️ **Database Aset Masih Kosong!** Silakan unggah master data aset terlebih dahulu di tab 'Upload Excel/CSV'.")
         return
 
-    # Ambil list SN unik dari database
+    # Ambil list SN unik
     list_sn = []
     if "SN" in df_asset.columns:
         list_sn = sorted([str(sn).strip() for sn in df_asset["SN"].unique() if str(sn).strip() not in ["", "-", "nan", "None"]])
 
-    # Ambil list Kd Site unik dari database
+    # Ambil list Kd Site unik
     list_kd_site = []
     if "Kd Site" in df_asset.columns:
         list_kd_site = sorted([str(kd).strip() for kd in df_asset["Kd Site"].unique() if str(kd).strip() not in ["", "-", "nan", "None"]])
     
-    # Ambil list DA / No Mobil unik dari database
-    list_da = []
-    if "No Mobil" in df_asset.columns:
-        list_da = sorted([str(da).strip() for da in df_asset["No Mobil"].unique() if str(da).strip() not in ["", "-", "nan", "None"]])
+    # AMBIL LIST DA / NO MOBIL DARI SELURUH KOLOM MUNGKIN
+    list_da = set()
+    for col in ["DA/No Mobil", "No Mobil", "DA", "Kode DA", "KODE DA/NO MOBIL"]:
+        if col in df_asset.columns:
+            vals = [str(v).strip() for v in df_asset[col].unique() if str(v).strip() not in ["", "-", "nan", "None"]]
+            list_da.update(vals)
+    sorted_list_da = sorted(list(list_da))
 
     st.markdown("##### 1. Pilih Aset yang Akan Dimutasi")
     selected_sn = st.selectbox(
@@ -60,7 +63,7 @@ def render_tab9(df_asset):
                 manual_kd_site = st.text_input("Ketik Kd Site Baru Manual*:", placeholder="Contoh: 030702", key="m_kd_site_manual")
 
             # DROPDOWN DA / NO MOBIL DARI DATABASE
-            opt_da = ["-- Pilih DA / No Mobil --"] + list_da + ["-- Ketik Manual --"]
+            opt_da = ["-- Pilih DA / No Mobil --"] + sorted_list_da + ["-- Ketik Manual --"]
             sel_da = st.selectbox("DA / No Mobil Baru*:", opt_da, key="m_da_select")
             
             manual_da = ""
@@ -117,7 +120,7 @@ def render_tab9(df_asset):
             elif catatan_tambahan.strip() == "":
                 st.error("❌ **Gagal Process!** Catatan Tambahan / Detail Mutasi wajib diisi.")
             else:
-                # CONVERT TO UPPERCASE & PEMETAAN NAMA SITE (DEPO)
+                # CONVERT TO UPPERCASE & PEMETAAN NAMA SITE
                 kd_site_cap = final_kd_site.strip().upper()
                 site_name_auto = SITE_MAP.get(kd_site_cap, f"DP {kd_site_cap}")
                 
@@ -135,11 +138,13 @@ def render_tab9(df_asset):
                 if not idx_target.empty:
                     target_sn = sn_pengganti if ket_mutasi == "TUKAR TABLET" else selected_sn
                     
-                    # UPDATE DATA DI DATABASE
+                    # UPDATE DATA DI DATABASE DENGAN NAMA KOLOM "DA/No Mobil"
                     df_curr.loc[idx_target, "User"] = nama_cap
                     df_curr.loc[idx_target, "Kd Site"] = kd_site_cap
                     df_curr.loc[idx_target, "Site"] = site_name_auto
-                    df_curr.loc[idx_target, "No Mobil"] = da_cap
+                    df_curr.loc[idx_target, "DA/No Mobil"] = da_cap
+                    if "No Mobil" in df_curr.columns:
+                        df_curr.loc[idx_target, "No Mobil"] = da_cap
                     df_curr.loc[idx_target, "SIM Card"] = sim_cap
                     df_curr.loc[idx_target, "NIK"] = nik_cap
                     df_curr.loc[idx_target, "SN"] = target_sn
