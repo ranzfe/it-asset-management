@@ -64,15 +64,16 @@ if not st.session_state["admin_logged_in"]:
 else:
     st.sidebar.success("✅ Terverifikasi sebagai Admin / IT EDP")
     
-    # KELUAR MODE ADMIN
+    # TOMBOL KELUAR MODE ADMIN
     if st.sidebar.button("🔒 Keluar Mode Admin"):
         st.session_state["admin_logged_in"] = False
         st.rerun()
 
     st.sidebar.markdown("---")
     
-    # FORM UBAH PASSWORD ADMIN (EXPANDER)
-    with st.sidebar.expander("🔑 Ubah Password Admin"):
+    # MENU UBAH PIN ADMIN DITAMPILKAN SECARA EKSPLISIT
+    st.sidebar.subheader("⚙️ Pengaturan Akses")
+    with st.sidebar.expander("🔑 Ubah PIN Admin", expanded=False):
         with st.form("form_change_pin", clear_on_submit=True):
             old_pin = st.text_input("PIN Lama*:", type="password")
             new_pin = st.text_input("PIN Baru*:", type="password")
@@ -91,7 +92,7 @@ else:
                     save_admin_pin(new_pin)
                     st.success("🎉 PIN Admin Berhasil Diperbarui!")
 
-st.sidebar.markdown("---")
+    st.sidebar.markdown("---")
 
 # --- TAMPILAN SESUAI HAK AKSES ---
 if not st.session_state["admin_logged_in"]:
@@ -160,5 +161,5 @@ else:
     with tab8:
         render_tab8(df_asset)
 
-    # RENDER AI ASSISTANT SIDEBAR
+    # RENDER AI ASSISTANT DI BAGIAN PALING BAWAH SIDEBAR
     render_ai_assistant()
