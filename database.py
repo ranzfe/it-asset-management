@@ -8,7 +8,17 @@ from github import Github
 DATA_FILE = "database_asset.csv"
 LOG_FILE = "history_log.csv"
 
-# HEADER DENGAN "DA/No Mobil" BARU (RAPIH)
+# DICTIONARY PEMETAAN KODE SITE RESMI
+SITE_MAP = {
+    "030601": "DP BOGOR",
+    "030603": "DP CIAMPEA",
+    "030604": "DP CILEUNGSI",
+    "030610": "DP DEPOK",
+    "030702": "DP BEKASI",
+    "030705": "DP CIKARANG",
+    "030722": "DP KARAWANG"
+}
+
 COLUMNS = [
     "SN", "Tipe", "Model", "Purchase Date", "Status Beli", 
     "Asal PO", "Status", "NIK", "User", "Kd Site", 
@@ -38,12 +48,22 @@ def commit_to_github(file_path, commit_message):
     except Exception as e:
         print(f"Bypass auto-commit GitHub: {e}")
 
+def normalize_site_data(df):
+    """Fungsi untuk memaksa koreksi kolom Site berdasarkan Kd Site"""
+    if "Kd Site" in df.columns and "Site" in df.columns:
+        df["Kd Site"] = df["Kd Site"].astype(str).str.strip()
+        # Paksa koreksi nilai Site berdasarkan SITE_MAP
+        for kd, site_name in SITE_MAP.items():
+            mask = df["Kd Site"].astype(str).str.strip() == kd
+            df.loc[mask, "Site"] = site_name
+    return df
+
 def load_data():
     if os.path.exists(DATA_FILE):
         try:
             df = pd.read_csv(DATA_FILE, dtype=str).fillna("")
             
-            # MAPPING OTOMATIS JIKA MASIH PAKAI NAMA KOLOM LAMA "No Mobil"
+            # Mapping otomatis jika masih pakai nama kolom lama
             if "No Mobil" in df.columns and "DA/No Mobil" not in df.columns:
                 df["DA/No Mobil"] = df["No Mobil"]
             elif "DA" in df.columns and "DA/No Mobil" not in df.columns:
@@ -52,7 +72,10 @@ def load_data():
             for col in COLUMNS:
                 if col not in df.columns:
                     df[col] = ""
-            return df
+                    
+            # Jalankan auto-koreksi nama site
+            df = normalize_site_data(df)
+            return df[COLUMNS]
         except Exception:
             return pd.DataFrame(columns=COLUMNS)
     return pd.DataFrame(columns=COLUMNS)
@@ -60,7 +83,6 @@ def load_data():
 def save_data(df):
     df_clean = df.fillna("").astype(str)
     
-    # Mapping otomatis jika ada input nama lama
     if "No Mobil" in df_clean.columns and "DA/No Mobil" not in df_clean.columns:
         df_clean["DA/No Mobil"] = df_clean["No Mobil"]
 
@@ -68,7 +90,10 @@ def save_data(df):
         if col not in df_clean.columns:
             df_clean[col] = ""
             
-    df_clean.to_csv(DATA_FILE, index=False)
+    # Auto-koreksi sebelum disimpan
+    df_clean = normalize_site_data(df_clean)
+            
+    df_clean[COLUMNS].to_csv(DATA_FILE, index=False)
     commit_to_github(DATA_FILE, f"Auto-update asset data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 def load_logs():
