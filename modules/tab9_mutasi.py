@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 from database import load_data, save_data, add_log
 
-# DICTIONARY PEMETAAN KODE SITE KETAT
+# DICTIONARY PEMETAAN KODE SITE
 SITE_MAP = {
     "030601": "DP BEKASI",
     "030603": "DP CIAMPEA",
@@ -22,10 +22,20 @@ def render_tab9(df_asset):
         st.warning("⚠️ **Database Aset Masih Kosong!** Silakan unggah master data aset terlebih dahulu di tab 'Upload Excel/CSV'.")
         return
 
-    # Ambil daftar SN unik
+    # Ambil list SN unik dari database
     list_sn = []
     if "SN" in df_asset.columns:
         list_sn = sorted([str(sn).strip() for sn in df_asset["SN"].unique() if str(sn).strip() not in ["", "-", "nan", "None"]])
+
+    # Ambil list Kd Site unik dari database
+    list_kd_site = []
+    if "Kd Site" in df_asset.columns:
+        list_kd_site = sorted([str(kd).strip() for kd in df_asset["Kd Site"].unique() if str(kd).strip() not in ["", "-", "nan", "None"]])
+    
+    # Ambil list DA / No Mobil unik dari database
+    list_da = []
+    if "No Mobil" in df_asset.columns:
+        list_da = sorted([str(da).strip() for da in df_asset["No Mobil"].unique() if str(da).strip() not in ["", "-", "nan", "None"]])
 
     st.markdown("##### 1. Pilih Aset yang Akan Dimutasi")
     selected_sn = st.selectbox(
@@ -41,8 +51,22 @@ def render_tab9(df_asset):
         
         col1, col2 = st.columns(2)
         with col1:
-            to_be_kd_site = st.text_input("Kd Site Baru* (Contoh: 030702):", placeholder="030702", key="m_kd_site_new")
-            to_be_da = st.text_input("DA / No Mobil Baru*:", key="m_da_new")
+            # DROPDOWN KD SITE DARI DATABASE
+            opt_kd_site = ["-- Pilih Kd Site --"] + list_kd_site + ["-- Ketik Manual --"]
+            sel_kd_site = st.selectbox("Kd Site Baru*:", opt_kd_site, key="m_kd_site_select")
+            
+            manual_kd_site = ""
+            if sel_kd_site == "-- Ketik Manual --":
+                manual_kd_site = st.text_input("Ketik Kd Site Baru Manual*:", placeholder="Contoh: 030702", key="m_kd_site_manual")
+
+            # DROPDOWN DA / NO MOBIL DARI DATABASE
+            opt_da = ["-- Pilih DA / No Mobil --"] + list_da + ["-- Ketik Manual --"]
+            sel_da = st.selectbox("DA / No Mobil Baru*:", opt_da, key="m_da_select")
+            
+            manual_da = ""
+            if sel_da == "-- Ketik Manual --":
+                manual_da = st.text_input("Ketik DA / No Mobil Baru Manual*:", key="m_da_manual")
+
             to_be_nama = st.text_input("Nama User / DA / ASP Baru*:", key="m_nama_new")
             
         with col2:
@@ -71,13 +95,17 @@ def render_tab9(df_asset):
         btn_submit = st.form_submit_button("💾 Simpan Mutasi & Update Database", type="primary")
 
         if btn_submit:
-            # VALIDASI WAJIB ISI (TERMASUK KODE SITE & LINK FOTO GDRIVE)
+            # PENENTUAN VALUE KD SITE & DA
+            final_kd_site = manual_kd_site if sel_kd_site == "-- Ketik Manual --" else sel_kd_site
+            final_da = manual_da if sel_da == "-- Ketik Manual --" else sel_da
+
+            # VALIDASI WAJIB ISI
             if selected_sn == "-- Pilih SN --":
                 st.error("❌ **Gagal Process!** Silakan pilih Serial Number (SN) terlebih dahulu.")
-            elif to_be_kd_site.strip() == "":
-                st.error("❌ **Gagal Process!** Kd Site Baru wajib diisi (Contoh: 030702).")
-            elif to_be_da.strip() == "":
-                st.error("❌ **Gagal Process!** DA / No Mobil Baru wajib diisi.")
+            elif final_kd_site in ["-- Pilih Kd Site --", ""]:
+                st.error("❌ **Gagal Process!** Kd Site Baru wajib dipilih atau diisi.")
+            elif final_da in ["-- Pilih DA / No Mobil --", ""]:
+                st.error("❌ **Gagal Process!** DA / No Mobil Baru wajib dipilih atau diisi.")
             elif to_be_nama.strip() == "":
                 st.error("❌ **Gagal Process!** Nama User Baru wajib diisi.")
             elif to_be_sim.strip() == "":
@@ -89,13 +117,11 @@ def render_tab9(df_asset):
             elif catatan_tambahan.strip() == "":
                 st.error("❌ **Gagal Process!** Catatan Tambahan / Detail Mutasi wajib diisi.")
             else:
-                # AUTO-CONVERT INPUT TEKS KE HURUF KAPITAL (UPPERCASE)
-                kd_site_cap = to_be_kd_site.strip().upper()
-                
-                # PEMETAAN OTOMATIS KD SITE SEHINGGA MEMPERBARUI KOLOM SITE (DEPO)
+                # CONVERT TO UPPERCASE & PEMETAAN NAMA SITE (DEPO)
+                kd_site_cap = final_kd_site.strip().upper()
                 site_name_auto = SITE_MAP.get(kd_site_cap, f"DP {kd_site_cap}")
                 
-                da_cap = to_be_da.strip().upper()
+                da_cap = final_da.strip().upper()
                 nama_cap = to_be_nama.strip().upper()
                 sim_cap = to_be_sim.strip().upper()
                 nik_cap = to_be_nik.strip().upper()
@@ -107,22 +133,22 @@ def render_tab9(df_asset):
                 idx_target = df_curr[df_curr["SN"].astype(str).str.strip().str.upper() == selected_sn.strip().upper()].index
                 
                 if not idx_target.empty:
-                    final_sn = sn_pengganti if ket_mutasi == "TUKAR TABLET" else selected_sn
+                    target_sn = sn_pengganti if ket_mutasi == "TUKAR TABLET" else selected_sn
                     
-                    # UPDATE DATA DI KOLOM UTAMA DATABASE
+                    # UPDATE DATA DI DATABASE
                     df_curr.loc[idx_target, "User"] = nama_cap
                     df_curr.loc[idx_target, "Kd Site"] = kd_site_cap
                     df_curr.loc[idx_target, "Site"] = site_name_auto
                     df_curr.loc[idx_target, "No Mobil"] = da_cap
                     df_curr.loc[idx_target, "SIM Card"] = sim_cap
                     df_curr.loc[idx_target, "NIK"] = nik_cap
-                    df_curr.loc[idx_target, "SN"] = final_sn
+                    df_curr.loc[idx_target, "SN"] = target_sn
                     df_curr.loc[idx_target, "Keterangan"] = catatan_cap
                     df_curr.loc[idx_target, "Link Foto Asset"] = foto_url
                     
-                    # PENCATATAN DETAIL KE HISTORY LOG
+                    # PENCATATAN KE HISTORY LOG
                     log_detail = f"MUTASI [{ket_mutasi}]: Diserahkan ke {nama_cap} ({kd_site_cap}-{site_name_auto} | {da_cap}). FOTO: {foto_url}. KETERANGAN: {catatan_cap}"
-                    add_log("MUTASI ASET", final_sn, nama_cap, log_detail)
+                    add_log("MUTASI ASET", target_sn, nama_cap, log_detail)
                     
                     save_data(df_curr)
                     
