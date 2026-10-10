@@ -8,10 +8,11 @@ from github import Github
 DATA_FILE = "database_asset.csv"
 LOG_FILE = "history_log.csv"
 
+# HEADER DENGAN "DA/No Mobil" BARU (RAPIH)
 COLUMNS = [
     "SN", "Tipe", "Model", "Purchase Date", "Status Beli", 
     "Asal PO", "Status", "NIK", "User", "Kd Site", 
-    "Site", "No Mobil", "SIM Card", "Imei", "Link Foto Asset", "Keterangan"
+    "Site", "DA/No Mobil", "SIM Card", "Imei", "Link Foto Asset", "Keterangan"
 ]
 
 STATUS_OPTIONS = ["Pakai", "Cadangan", "Rusak", "Hilang", "Jual"]
@@ -41,6 +42,16 @@ def load_data():
     if os.path.exists(DATA_FILE):
         try:
             df = pd.read_csv(DATA_FILE, dtype=str).fillna("")
+            
+            # MAPPING OTOMATIS JIKA MASIH PAKAI NAMA KOLOM LAMA "No Mobil"
+            if "No Mobil" in df.columns and "DA/No Mobil" not in df.columns:
+                df["DA/No Mobil"] = df["No Mobil"]
+            elif "DA" in df.columns and "DA/No Mobil" not in df.columns:
+                df["DA/No Mobil"] = df["DA"]
+
+            for col in COLUMNS:
+                if col not in df.columns:
+                    df[col] = ""
             return df
         except Exception:
             return pd.DataFrame(columns=COLUMNS)
@@ -49,25 +60,10 @@ def load_data():
 def save_data(df):
     df_clean = df.fillna("").astype(str)
     
-    # Normalisasi Pemetaan Kolom Otomatis
-    col_map = {}
-    for col in df_clean.columns:
-        c_upper = col.strip().upper()
-        if c_upper in ["KET SITE", "DEPO", "LOKASI"]:
-            col_map[col] = "Site"
-        elif c_upper in ["DA", "KODE DA", "KODE DA/NO MOBIL"]:
-            col_map[col] = "No Mobil"
-        elif c_upper in ["NAMA DA", "NAMA USER", "NAMA ASP"]:
-            col_map[col] = "User"
-        elif c_upper in ["SIM", "NOMOR SIM", "MSISDN"]:
-            col_map[col] = "SIM Card"
-            
-    if col_map:
-        for old_c, new_c in col_map.items():
-            if new_c not in df_clean.columns or df_clean[new_c].str.strip().eq("").all():
-                df_clean[new_c] = df_clean[old_c]
+    # Mapping otomatis jika ada input nama lama
+    if "No Mobil" in df_clean.columns and "DA/No Mobil" not in df_clean.columns:
+        df_clean["DA/No Mobil"] = df_clean["No Mobil"]
 
-    # Pastikan kolom standar ada
     for col in COLUMNS:
         if col not in df_clean.columns:
             df_clean[col] = ""
