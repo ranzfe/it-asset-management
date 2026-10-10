@@ -7,21 +7,38 @@ def render_tab9(df_asset):
     st.subheader("🔄 Form Mutasi & Perubahan User Aset (AS IS ➔ TO BE)")
     st.caption("Form ini digunakan untuk mencatat perpindahan tablet/hardware antar user/sales/DA, tukar unit, atau perubahan rute DA/ASP.")
 
-    list_sn = sorted([sn for sn in df_asset["SN"].unique() if str(sn).strip() != ""])
+    list_sn = sorted([str(sn).strip() for sn in df_asset["SN"].unique() if str(sn).strip() not in ["", "-", "nan", "None"]])
     
-    # PILIH SN DI LUAR FORM AGAR DATA AS IS LANGSUNG DITARIK REA-TIME
     st.markdown("##### 1. Pilih Aset yang Akan Dimutasi")
     selected_sn_mutasi = st.selectbox("Pilih Serial Number (SN) Aset Saat Ini:", ["-- Pilih SN --"] + list_sn, key="sel_sn_mutasi_ext")
     
-    # Auto-pull data AS IS dari database
+    # PEBAIKAN PEMETAAN PRESISI UNTUK DATA AS IS
     as_is_depo = as_is_da = as_is_nama = as_is_sim = as_is_nik = ""
+    
     if selected_sn_mutasi != "-- Pilih SN --":
-        r_curr = df_asset[df_asset["SN"] == selected_sn_mutasi].iloc[0]
-        as_is_depo = str(r_curr.get("Site", ""))
-        as_is_da = str(r_curr.get("No Mobil", ""))
-        as_is_nama = str(r_curr.get("User", ""))
-        as_is_sim = str(r_curr.get("SIM Card", ""))
-        as_is_nik = str(r_curr.get("NIK", ""))
+        # Cari baris yang cocok berdasarkan SN (case-insensitive)
+        match_row = df_asset[df_asset["SN"].astype(str).str.strip().str.upper() == selected_sn_mutasi.upper()]
+        
+        if not match_row.empty:
+            r_curr = match_row.iloc[0]
+            
+            # DEPO -> Ket Site / Site
+            as_is_depo = str(r_curr.get("Ket Site", r_curr.get("Site", ""))).strip()
+            
+            # KODE DA -> DA / No Mobil
+            as_is_da = str(r_curr.get("DA", r_curr.get("No Mobil", ""))).strip()
+            
+            # NAMA USER -> Nama DA / User / Nama ASP
+            nama_da_v = str(r_curr.get("Nama DA", "")).strip()
+            nama_asp_v = str(r_curr.get("Nama ASP", "")).strip()
+            user_v = str(r_curr.get("User", "")).strip()
+            as_is_nama = nama_da_v if nama_da_v != "" else (nama_asp_v if nama_asp_v != "" else user_v)
+            
+            # NO SIMCARD -> SIM Card / SIM
+            as_is_sim = str(r_curr.get("SIM Card", r_curr.get("SIM", ""))).strip()
+            
+            # EMPLOYEE NIK -> NIK
+            as_is_nik = str(r_curr.get("NIK", "")).strip()
 
     st.markdown("---")
     
@@ -31,12 +48,12 @@ def render_tab9(df_asset):
         # TAMPILAN DATA AS IS (KONDISI SEBELUMNYA)
         with col_asis:
             st.markdown("### 📌 KONDISI SAAT INI (AS IS)")
-            st.text_input("Depo (AS IS):", value=as_is_depo, disabled=True, key="m_as_depo")
-            st.text_input("Kode DA / ASP (AS IS):", value=as_is_da, disabled=True, key="m_as_da")
-            st.text_input("Nama User / DA / ASP (AS IS):", value=as_is_nama, disabled=True, key="m_as_nama")
-            st.text_input("Serial Number (AS IS):", value=selected_sn_mutasi, disabled=True, key="m_as_sn")
-            st.text_input("No SIM Card (AS IS):", value=as_is_sim, disabled=True, key="m_as_sim")
-            st.text_input("Employee NIK (AS IS):", value=as_is_nik, disabled=True, key="m_as_nik")
+            st.text_input("Depo (AS IS - Ket Site):", value=as_is_depo, disabled=True, key="m_as_depo")
+            st.text_input("Kode DA / ASP (AS IS - DA):", value=as_is_da, disabled=True, key="m_as_da")
+            st.text_input("Nama User / DA / ASP (AS IS - User):", value=as_is_nama, disabled=True, key="m_as_nama")
+            st.text_input("Serial Number (AS IS - SN):", value=selected_sn_mutasi if selected_sn_mutasi != "-- Pilih SN --" else "", disabled=True, key="m_as_sn")
+            st.text_input("No SIM Card (AS IS - SIM Card):", value=as_is_sim, disabled=True, key="m_as_sim")
+            st.text_input("Employee NIK (AS IS - NIK):", value=as_is_nik, disabled=True, key="m_as_nik")
 
         # INPUT DATA TO BE (PENERIMA / PERUBAHAN BARU)
         with col_tobe:
@@ -44,7 +61,7 @@ def render_tab9(df_asset):
             to_be_depo = st.text_input("Depo Baru (TO BE):", value=as_is_depo, key="m_to_depo")
             to_be_da = st.text_input("Kode DA / ASP Baru (TO BE):", value=as_is_da, key="m_to_da")
             to_be_nama = st.text_input("Nama User / DA / ASP Baru (TO BE):", value="", key="m_to_nama")
-            to_be_sn = st.selectbox("SN Device Baru (Isi jika Tukar Unit):", [selected_sn_mutasi] + [sn for sn in list_sn if sn != selected_sn_mutasi], key="m_to_sn")
+            to_be_sn = st.selectbox("SN Device Baru (Isi jika Tukar Unit):", [selected_sn_mutasi if selected_sn_mutasi != "-- Pilih SN --" else ""] + [sn for sn in list_sn if sn != selected_sn_mutasi], key="m_to_sn")
             to_be_sim = st.text_input("No SIM Card Baru (TO BE):", value=as_is_sim, key="m_to_sim")
             to_be_nik = st.text_input("Employee NIK Baru (TO BE):", value="", key="m_to_nik")
 
@@ -65,7 +82,7 @@ def render_tab9(df_asset):
             else:
                 df_curr = load_data()
                 
-                idx_target = df_curr[df_curr["SN"] == selected_sn_mutasi].index
+                idx_target = df_curr[df_curr["SN"].astype(str).str.strip().str.upper() == selected_sn_mutasi.upper()].index
                 if not idx_target.empty:
                     df_curr.loc[idx_target, "User"] = to_be_nama
                     df_curr.loc[idx_target, "Site"] = to_be_depo
