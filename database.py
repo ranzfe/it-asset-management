@@ -40,17 +40,21 @@ def commit_to_github(file_path, commit_message):
 def load_data():
     if os.path.exists(DATA_FILE):
         try:
-            df = pd.read_csv(DATA_FILE, dtype=str)
+            df = pd.read_csv(DATA_FILE, dtype=str).fillna("")
             for col in COLUMNS:
                 if col not in df.columns:
                     df[col] = ""
-            return df[COLUMNS].fillna("")
+            return df
         except Exception:
             return pd.DataFrame(columns=COLUMNS)
     return pd.DataFrame(columns=COLUMNS)
 
 def save_data(df):
-    df_clean = df[COLUMNS].fillna("")
+    df_clean = df.fillna("").astype(str)
+    # Pastikan kolom standar ada
+    for col in COLUMNS:
+        if col not in df_clean.columns:
+            df_clean[col] = ""
     df_clean.to_csv(DATA_FILE, index=False)
     commit_to_github(DATA_FILE, f"Auto-update asset data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
