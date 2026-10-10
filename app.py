@@ -34,8 +34,9 @@ col5.metric("Jual", jual_count)
 st.markdown("---")
 
 # --- TAB MENU UTAMA ---
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📋 Daftar, Sort & Filter Aset", 
+    "📄 Serah Terima Hardware (BAST)",
     "📊 Analytics & Grafik",
     "✏️ Edit & Hapus Aset",
     "📤 Upload Excel/CSV", 
@@ -89,7 +90,7 @@ with tab1:
         df_filtered = df_filtered[mask]
         
     if filter_status != "Semua Status":
-        df_filtered = df_filtered[df_filtered["Status"] == filter_status]
+        df_filtered = df_filtered[filter_status]
 
     if filter_tipe != "Semua Tipe":
         df_filtered = df_filtered[df_filtered["Tipe"] == filter_tipe]
@@ -132,8 +133,213 @@ with tab1:
             excel_data = output.getvalue()
             st.download_button("📊 Export Excel (.xlsx)", excel_data, "export_it_asset.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-# TAB 2: ANALYTICS & GRAFIK
+# TAB 2: SERAH TERIMA HARDWARE (BAST PRINTABLE)
 with tab2:
+    st.subheader("📄 Form Tanda Terima Hardware")
+    st.caption("Pilih aset, isi data penyerahan, cetak dokumen, dan update database otomatis.")
+    
+    list_sn_st = sorted([sn for sn in df_asset["SN"].unique() if str(sn).strip() != ""])
+    
+    col_st1, col_st2 = st.columns([1, 2])
+    
+    with col_st1:
+        st.markdown("##### 📝 Input Data Serah Terima")
+        selected_sns = st.multiselect("Pilih SN Hardware:", list_sn_st, key="st_sns")
+        
+        # Ambil auto data dari SN pertama
+        auto_po = auto_tipe = auto_model = auto_user = auto_site = ""
+        if selected_sns:
+            r_first = df_asset[df_asset["SN"] == selected_sns[0]].iloc[0]
+            auto_po = str(r_first.get("Asal PO", ""))
+            auto_tipe = str(r_first.get("Tipe", ""))
+            auto_model = str(r_first.get("Model", ""))
+            auto_user = str(r_first.get("User", ""))
+            auto_site = str(r_first.get("Site", ""))
+            
+        no_bast = st.text_input("No. BAST / Surat:", value=f"ST/{datetime.now().strftime('%Y%m%d')}/001")
+        po_no = st.text_input("PO. No:", value=auto_po)
+        tgl_st = st.date_input("Tanggal:", datetime.now())
+        
+        st.markdown("---")
+        telah_diterima = st.text_input("Telah Diterima Dari:", value="FEBRIKA PUJIASMORO")
+        nama_user_st = st.text_input("Nama User Penerima:", value=auto_user)
+        jabatan_st = st.text_input("Jabatan / Lokasi Site:", value=auto_site)
+        
+        st.markdown("---")
+        jenis_barang_st = st.text_input("Jenis Barang:", value=f"{auto_tipe} {auto_model}".strip())
+        merk_tipe_st = st.text_input("Merk / Tipe:", value=auto_model)
+        qty_st = st.number_input("Qty:", min_value=1, value=len(selected_sns) if selected_sns else 1)
+        
+        st.markdown("---")
+        st.markdown("**Data Pelengkap (Checklist):**")
+        col_chk1, col_chk2 = st.columns(2)
+        with col_chk1:
+            chk_baterai = st.checkbox("Baterai", value=True)
+            chk_charger = st.checkbox("Charger", value=True)
+            chk_tas = st.checkbox("Tas Notebook/Tab", value=True)
+        with col_chk2:
+            chk_mouse = st.checkbox("Mouse")
+            chk_keyboard = st.checkbox("Keyboard")
+            chk_kabel = st.checkbox("Kabel Power / USB")
+            
+        catatan_st = st.text_area("Catatan Tambahan:", value="TAB FOR DA")
+        
+        st.markdown("---")
+        penerima_st = st.text_input("Yang Menerima:", value=nama_user_st)
+        pemeriksa_st = st.text_input("Yang Memeriksa:", value="IT SUPPORT")
+        penyerah_st = st.text_input("Yang Menyerahkan:", value=telah_diterima)
+        lokasi_cetak = st.text_input("Kota Cetak:", value="BEKASI")
+
+        # TOMBOL UPDATE DATABASE OTOMATIS
+        if st.button("💾 Simpan & Update Database Aset", type="primary"):
+            if selected_sns:
+                df_curr = load_data()
+                for sn_item in selected_sns:
+                    idx_m = df_curr[df_curr["SN"] == sn_item].index
+                    if not idx_m.empty:
+                        df_curr.loc[idx_m, "User"] = nama_user_st
+                        df_curr.loc[idx_m, "Site"] = jabatan_st
+                        df_curr.loc[idx_m, "Status"] = "Pakai"
+                        add_log("SERAH TERIMA (BAST)", sn_item, nama_user_st, f"Diserahkan ke {nama_user_st} ({jabatan_st}) via BAST {no_bast}")
+                save_data(df_curr)
+                st.success("✅ **Database Berhasil Di-update!** User & Lokasi Aset diperbarui.")
+                st.rerun()
+            else:
+                st.warning("Pilih minimal 1 SN Hardware.")
+
+    with col_st2:
+        st.markdown("##### 🖨️ Pratinjau Dokumen Cetak (Print Preview)")
+        
+        sn_list_html = "<br>".join(selected_sns) if selected_sns else "SN-XXXXXX"
+        tgl_str = tgl_st.strftime("%d %B %Y").upper()
+        
+        # HTML DOKUMEN CETAK ARTABOGA PERFECT LAYOUT
+        html_doc = f"""
+        <div id="print-area" style="background-color: white; color: black; padding: 25px; border: 2px solid #333; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.4;">
+            <table style="width: 100%; border-collapse: collapse; border: none;">
+                <tr>
+                    <td style="width: 60%; vertical-align: top;">
+                        <table style="border: none; font-size: 13px;">
+                            <tr><td style="width: 80px;">No</td><td>: {no_bast}</td></tr>
+                            <tr><td>PO. No</td><td>: {po_no}</td></tr>
+                            <tr><td>Tanggal</td><td>: {tgl_str}</td></tr>
+                        </table>
+                    </td>
+                    <td style="width: 40%; text-align: right; vertical-align: top;">
+                        <div style="font-size: 22px; font-weight: bold; color: #000; letter-spacing: -1px;">artaboga</div>
+                        <div style="font-size: 10px; color: #555;">DISTRIBUSI</div>
+                    </td>
+                </tr>
+            </table>
+
+            <div style="text-align: center; margin: 15px 0; font-size: 18px; font-weight: bold; text-decoration: underline;">
+                TANDA TERIMA HARDWARE
+            </div>
+
+            <table style="width: 100%; margin-bottom: 15px; font-size: 13px; border: none;">
+                <tr><td style="width: 130px;">Telah diterima dari</td><td>: {telah_diterima}</td></tr>
+                <tr><td>Nama user</td><td>: {nama_user_st}</td></tr>
+                <tr><td>Jabatan</td><td>: {jabatan_st}</td></tr>
+            </table>
+
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid black; text-align: center; font-size: 12px; margin-bottom: 10px;">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        <th style="border: 1px solid black; padding: 6px; width: 8%;">No</th>
+                        <th style="border: 1px solid black; padding: 6px; width: 35%;">Jenis Barang</th>
+                        <th style="border: 1px solid black; padding: 6px; width: 25%;">Merk / Tipe</th>
+                        <th style="border: 1px solid black; padding: 6px; width: 24%;">SN & HW ID</th>
+                        <th style="border: 1px solid black; padding: 6px; width: 8%;">Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="border: 1px solid black; padding: 12px; vertical-align: top;">1.</td>
+                        <td style="border: 1px solid black; padding: 12px; vertical-align: top;">{jenis_barang_st}</td>
+                        <td style="border: 1px solid black; padding: 12px; vertical-align: top;">{merk_tipe_st}</td>
+                        <td style="border: 1px solid black; padding: 12px; vertical-align: top; font-weight: bold;">{sn_list_html}</td>
+                        <td style="border: 1px solid black; padding: 12px; vertical-align: top;">{qty_st}</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div style="font-size: 10px; font-style: italic; margin-bottom: 10px;">
+                Item: PC / Notebook / Monitor / UPS / Printer / Tape Drive / LCD Projector / Scanner / Hub / Switch / Print Server / Modem
+            </div>
+
+            <div style="font-weight: bold; font-size: 12px; text-decoration: underline; margin-bottom: 5px;">Data Pelengkap :</div>
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid black; font-size: 11px; margin-bottom: 10px;">
+                <tr style="background-color: #f2f2f2; font-weight: bold; text-align: center;">
+                    <td style="border: 1px solid black; padding: 4px; width: 30%;">Spesifikasi / merk / tipe / size / driver</td>
+                    <td style="border: 1px solid black; padding: 4px; width: 23%;">PC / Notebook</td>
+                    <td style="border: 1px solid black; padding: 4px; width: 23%;">Notebook / Tablet</td>
+                    <td style="border: 1px solid black; padding: 4px; width: 24%;">Lain-lain</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 6px; vertical-align: top;">
+                        -Proc speed<br>-HDD size<br>-Mem size<br>-Password<br>-NIC driver<br>-CD driver<br>-Modem driver
+                    </td>
+                    <td style="border: 1px solid black; padding: 6px; vertical-align: top;">
+                        -NIC [{ '✔' if chk_mouse else ' ' }]<br>
+                        -Keyboard [{ '✔' if chk_keyboard else ' ' }]<br>
+                        -Mouse [{ '✔' if chk_mouse else ' ' }]<br>
+                        -Kabel power [{ '✔' if chk_kabel else ' ' }]
+                    </td>
+                    <td style="border: 1px solid black; padding: 6px; vertical-align: top;">
+                        -Baterai [{ '✔' if chk_baterai else ' ' }]<br>
+                        -Charger [{ '✔' if chk_charger else ' ' }]<br>
+                        -LCD Display [✔]<br>
+                        -Tas notebook [{ '✔' if chk_tas else ' ' }]
+                    </td>
+                    <td style="border: 1px solid black; padding: 6px; vertical-align: top;">
+                        Printer:<br>
+                        -Kabel power [{ '✔' if chk_kabel else ' ' }]<br>
+                        -Kabel USB [{ '✔' if chk_kabel else ' ' }]
+                    </td>
+                </tr>
+            </table>
+
+            <div style="font-size: 12px; margin-bottom: 25px;">
+                <b>Catatan :</b> <i>{catatan_st}</i>
+            </div>
+
+            <table style="width: 100%; border: none; text-align: center; font-size: 12px; margin-top: 30px;">
+                <tr>
+                    <td style="width: 33%;">Yang menerima</td>
+                    <td style="width: 33%;">Yang memeriksa</td>
+                    <td style="width: 33%;">{lokasi_cetak}, {tgl_str}<br>Yang menyerahkan</td>
+                </tr>
+                <tr style="height: 60px;"><td></td><td></td><td></td></tr>
+                <tr>
+                    <td><b>( {penerima_st} )</b></td>
+                    <td><b>( {pemeriksa_st} )</b></td>
+                    <td><b>( {penyerah_st} )</b></td>
+                </tr>
+            </table>
+        </div>
+        """
+        
+        st.components.v1.html(
+            f"""
+            {html_doc}
+            <br>
+            <button onclick="window.print()" style="background-color: #008CBA; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">
+                🖨️ Cetak / Simpan PDF Dokumen Ini
+            </button>
+            <style>
+                @media print {{
+                    body * {{ visibility: hidden; }}
+                    #print-area, #print-area * {{ visibility: visible; }}
+                    #print-area {{ position: absolute; left: 0; top: 0; width: 100%; border: none !important; }}
+                }}
+            </style>
+            """,
+            height=700,
+            scrolling=True
+        )
+
+# TAB 3: ANALYTICS & GRAFIK
+with tab3:
     st.subheader("📊 Analisis & Distribusi Aset IT")
     if not df_asset.empty:
         col_g1, col_g2 = st.columns(2)
@@ -150,8 +356,8 @@ with tab2:
     else:
         st.info("Belum ada data untuk grafik analisis.")
 
-# TAB 3: EDIT & HAPUS ASET
-with tab3:
+# TAB 4: EDIT & HAPUS ASET
+with tab4:
     st.subheader("✏️ Kelola (Edit & Hapus) Data Aset")
     if df_asset.empty:
         st.info("Belum ada data aset.")
@@ -224,8 +430,8 @@ with tab3:
                     st.success(f"✅ **Selesai!** SN {selected_sn} berhasil dihapus.")
                     st.rerun()
 
-# TAB 4: UPLOAD FILE
-with tab4:
+# TAB 5: UPLOAD FILE
+with tab5:
     st.subheader("Upload File Excel / CSV")
     uploaded_file = st.file_uploader("Pilih file Excel (.xlsx) atau CSV (.csv)", type=["xlsx", "csv"])
     if uploaded_file is not None:
@@ -281,8 +487,8 @@ with tab4:
         except Exception as e:
             st.error(f"Error reading file: {e}")
 
-# TAB 5: TAMBAH MANUAL
-with tab5:
+# TAB 6: TAMBAH MANUAL
+with tab6:
     st.subheader("Form Tambah Aset Manual")
     with st.form("form_tambah_aset", clear_on_submit=True):
         col_a, col_b, col_c = st.columns(3)
@@ -320,8 +526,8 @@ with tab5:
             add_log("TAMBAH BARU (Manual)", sn, user, f"Tambah manual Aset {tipe} {model}")
             st.success(f"✅ **SELESAI!** Aset SN `{sn}` tersimpan.")
 
-# TAB 6: LOG HISTORY
-with tab6:
+# TAB 7: LOG HISTORY
+with tab7:
     st.subheader("📜 Riwayat & Log Perubahan Data Aset")
     df_logs = load_logs()
     if not df_logs.empty:
@@ -333,8 +539,8 @@ with tab6:
     else:
         st.info("Belum ada riwayat aktivitas.")
 
-# TAB 7: PLOTTING TAGIHAN SIMCARD (STATUS DENGAN SYARAT KELENGKAPAN USER)
-with tab7:
+# TAB 8: PLOTTING TAGIHAN SIMCARD
+with tab8:
     st.subheader("📱 Auto-Plotting Tagihan SIM Card")
     st.caption("Alur Kerja: Tagihan Telkom ➔ Cek Historis (Dapatkan Kode DA/No Mobil) ➔ Validasi Keaktifan & Deep Search SN Device dari Update Bulan Ini.")
     
@@ -364,7 +570,6 @@ with tab7:
             st.markdown("---")
             st.markdown("##### 🎛️ Konfirmasi Pemetaan Kolom File Upload:")
             
-            # PEMETAAN KOLOM TELKOM
             tel_cols = ["-- Pilih Kolom --"] + list(df_tel.columns)
             col_t1, col_t2 = st.columns(2)
             
@@ -385,7 +590,6 @@ with tab7:
             with col_t2:
                 col_tel_tagihan = st.selectbox("📌 Kolom Jumlah Tagihan (File Telkom):", tel_cols, index=def_tagihan)
 
-            # PEMETAAN KOLOM USER AKTIF BULAN INI
             if not df_users.empty:
                 st.markdown("---")
                 st.markdown("##### 👤 Pemetaan Kolom File Data Update User Terbaru Bulan Ini:")
@@ -424,7 +628,6 @@ with tab7:
                 if col_tel_msisdn == "-- Pilih Kolom --":
                     st.error("Pilih kolom Nomor SIM / MSISDN terlebih dahulu!")
                 else:
-                    # Normalisasi SIM pada File Historis
                     if not df_hist.empty:
                         sim_col_hist = [c for c in df_hist.columns if any(k in c.upper() for k in ["SIM", "MSISDN", "NOMOR"])]
                         if sim_col_hist:
@@ -432,7 +635,6 @@ with tab7:
                         else:
                             df_hist["SIM_clean"] = ""
 
-                    # Normalisasi SIM pada File Update User (Jika ada)
                     if not df_users.empty:
                         sim_col_usr = [c for c in df_users.columns if any(k in c.upper() for k in ["SIM", "MSISDN", "NOMOR"])]
                         if sim_col_usr:
@@ -448,7 +650,7 @@ with tab7:
 
                         depo_val = user_val = mobil_val = sn_val = "-"
 
-                        # ALUR 1: CEK DAHULU KE DATA HISTORIS DARI NOMOR SIM
+                        # ALUR 1: CEK HISTORIS
                         hist_match = pd.DataFrame()
                         if not df_hist.empty and sim_clean != "" and "SIM_clean" in df_hist.columns:
                             hist_match = df_hist[df_hist["SIM_clean"] == sim_clean]
@@ -460,11 +662,10 @@ with tab7:
                             mobil_val = str(h_target.get("KODE DA/NO MOBIL", "-")).strip()
                             sn_val = str(h_target.get("SN DEVICE", "-")).strip()
 
-                        # ALUR 2: CEK KE DATA UPDATE TERBARU BULAN INI
+                        # ALUR 2: CEK UPDATE TERBARU BULAN INI
                         if not df_users.empty:
                             user_match = pd.DataFrame()
                             
-                            # A. Cari berdasarkan Kode DA / No Mobil yang ditarik dari Historis
                             if mobil_val not in ["-", ""]:
                                 target_da = mobil_val.strip().upper()
                                 if col_u_da != "-- Pilih / Tidak Ada --":
@@ -478,43 +679,37 @@ with tab7:
                                             user_match = m
                                             break
 
-                            # B. Cari berdasarkan Nomor SIM langsung jika belum ketemu
                             if user_match.empty and sim_clean != "" and "SIM_clean" in df_users.columns:
                                 user_match = df_users[df_users["SIM_clean"] == sim_clean]
 
                             if not user_match.empty:
                                 u_row = user_match.iloc[0]
                                 
-                                # Update DEPO -> Ket Site
                                 if col_u_site != "-- Pilih / Tidak Ada --":
                                     val_site = str(u_row.get(col_u_site, "")).strip()
                                     if val_site not in ["", "-", "nan", "None"]:
                                         depo_val = val_site
                                 
-                                # Update NAMA USER -> Nama DA / Nama ASP
                                 nama_da_v = str(u_row.get(col_u_namada, "")).strip() if col_u_namada != "-- Pilih / Tidak Ada --" else ""
                                 nama_asp_v = str(u_row.get(col_u_asp, "")).strip() if col_u_asp != "-- Pilih / Tidak Ada --" else ""
                                 new_user = nama_da_v if nama_da_v != "" else (nama_asp_v if nama_asp_v != "" else "")
                                 if new_user not in ["", "-", "nan", "None"]:
                                     user_val = new_user
 
-                                # Update KODE DA / NO MOBIL
                                 da_v = str(u_row.get(col_u_da, "")).strip() if col_u_da != "-- Pilih / Tidak Ada --" else ""
                                 mobil_v = str(u_row.get(col_u_mobil, "")).strip() if col_u_mobil != "-- Pilih / Tidak Ada --" else ""
                                 new_da = da_v if da_v != "" else (mobil_v if mobil_v != "" else "")
                                 if new_da not in ["", "-", "nan", "None"]:
                                     mobil_val = new_da
 
-                                # Tarik SN dari baris match
                                 if col_u_sn != "-- Pilih / Tidak Ada --":
                                     c_sn = str(u_row.get(col_u_sn, "")).strip()
                                     if c_sn not in ["", "-", "nan", "None"]:
                                         sn_val = c_sn
 
-                        # DEEP SEARCH SN DEVICE BERDASARKAN KODE DA PADA SELURUH FILE USER AKTIF
+                        # DEEP SEARCH SN DEVICE
                         if (sn_val in ["-", "", "nan", "None"]) and not df_users.empty and mobil_val not in ["-", ""]:
                             target_da_clean = mobil_val.strip().upper()
-                            
                             matches_da_all = pd.DataFrame()
                             if col_u_da != "-- Pilih / Tidak Ada --":
                                 matches_da_all = df_users[df_users[col_u_da].astype(str).str.strip().str.upper() == target_da_clean]
@@ -536,7 +731,7 @@ with tab7:
                                             sn_val = found_sn
                                             break
 
-                        # ALUR 3: FALLBACK DATABASE ITAM INTERNAL JIKA SN MASIH KOSONG
+                        # FALLBACK DB ITAM
                         if sn_val in ["-", "", "nan", "None"]:
                             db_match = pd.DataFrame()
                             if mobil_val not in ["-", ""]:
@@ -551,12 +746,8 @@ with tab7:
                                 if mobil_val in ["-", ""]: mobil_val = str(db_target.get("No Mobil", "-"))
                                 sn_val = str(db_target.get("SN", "-"))
 
-                        # SYARAT STATUS AKTIF / TIDAK AKTIF DITENTUKAN HANYA OLEH KEBERADAAN NAMA USER
                         clean_user_check = str(user_val).strip()
-                        if clean_user_check not in ["", "-", "nan", "None"]:
-                            ket_status = "AKTIF"
-                        else:
-                            ket_status = "TIDAK AKTIF"
+                        ket_status = "AKTIF" if clean_user_check not in ["", "-", "nan", "None"] else "TIDAK AKTIF"
 
                         results.append({
                             "DEPO": depo_val,
@@ -571,7 +762,6 @@ with tab7:
                     st.session_state["plotting_result"] = pd.DataFrame(results)
                     st.success("🎉 **Auto-Plotting Selesai!** Status AKTIF/TIDAK AKTIF diperbarui secara presisi.")
 
-            # FITUR SORTING, FILTER, & RINGKASAN REKAPITULASI
             if "plotting_result" in st.session_state and not st.session_state["plotting_result"].empty:
                 df_res = st.session_state["plotting_result"].copy()
 
@@ -589,13 +779,11 @@ with tab7:
                 with col_f2:
                     filter_ket = st.selectbox("Filter Keterangan:", ["Semua Status", "AKTIF", "TIDAK AKTIF"])
 
-                # PROSES FILTER
                 if filter_depo != "Semua Depo":
                     df_res = df_res[df_res["DEPO"] == filter_depo]
                 if filter_ket != "Semua Status":
                     df_res = df_res[df_res["KETERANGAN"] == filter_ket]
 
-                # PROSES SORTING
                 asc_flag = True if sort_order_plot == "A-Z (Asc)" else False
                 if sort_col_plot == "TAGIHAN":
                     df_res["_tagihan_num"] = pd.to_numeric(df_res["TAGIHAN"].str.replace(r'\D', '', regex=True), errors='coerce').fillna(0)
@@ -603,7 +791,6 @@ with tab7:
                 else:
                     df_res = df_res.sort_values(by=sort_col_plot, ascending=asc_flag)
 
-                # METRICS RINGKASAN
                 st.markdown("---")
                 col_m1, col_m2, col_m3, col_m4 = st.columns(4)
                 tot_items = len(df_res)
@@ -627,7 +814,6 @@ with tab7:
                     num_rows="dynamic"
                 )
 
-                # EXPORT HASIL AKHIR EXCEL
                 output_plot = io.BytesIO()
                 with pd.ExcelWriter(output_plot, engine='openpyxl') as writer:
                     edited_plotting.to_excel(writer, index=False, sheet_name='Hasil_Plotting')
