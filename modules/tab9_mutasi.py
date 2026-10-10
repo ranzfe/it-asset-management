@@ -3,9 +3,9 @@ import pandas as pd
 from datetime import datetime
 from database import load_data, save_data, add_log
 
-# DICTIONARY PEMETAAN KODE SITE
+# DICTIONARY PEMETAAN KODE SITE RESMI (TERBARU)
 SITE_MAP = {
-    "030601": "DP BEKASI",
+    "030601": "DP BOGOR",
     "030603": "DP CIAMPEA",
     "030604": "DP CILEUNGSI",
     "030610": "DP DEPOK",
@@ -32,9 +32,9 @@ def render_tab9(df_asset):
     if "Kd Site" in df_asset.columns:
         list_kd_site = sorted([str(kd).strip() for kd in df_asset["Kd Site"].unique() if str(kd).strip() not in ["", "-", "nan", "None"]])
     
-    # AMBIL LIST DA / NO MOBIL DARI SELURUH KOLOM MUNGKIN
+    # Ambil list DA / No Mobil unik dari seluruh variasi kolom
     list_da = set()
-    for col in ["DA/No Mobil", "No Mobil", "DA", "Kode DA", "KODE DA/NO MOBIL"]:
+    for col in ["DA/No Mobil", "No Mobil", "DA", "Kode DA"]:
         if col in df_asset.columns:
             vals = [str(v).strip() for v in df_asset[col].unique() if str(v).strip() not in ["", "-", "nan", "None"]]
             list_da.update(vals)
@@ -60,15 +60,15 @@ def render_tab9(df_asset):
             
             manual_kd_site = ""
             if sel_kd_site == "-- Ketik Manual --":
-                manual_kd_site = st.text_input("Ketik Kd Site Baru Manual*:", placeholder="Contoh: 030702", key="m_kd_site_manual")
+                manual_kd_site = st.text_input("Ketik Kd Site Baru Manual*:", placeholder="Contoh: 030601", key="m_kd_site_manual")
 
-            # DROPDOWN DA / NO MOBIL DARI DATABASE
-            opt_da = ["-- Pilih DA / No Mobil --"] + sorted_list_da + ["-- Ketik Manual --"]
+            # DROPDOWN DA / NO MOBIL DENGAN OPSI CUSTOM
+            opt_da = ["-- Pilih DA / No Mobil --"] + sorted_list_da + ["-- Ketik Manual / DA Baru --"]
             sel_da = st.selectbox("DA / No Mobil Baru*:", opt_da, key="m_da_select")
             
             manual_da = ""
-            if sel_da == "-- Ketik Manual --":
-                manual_da = st.text_input("Ketik DA / No Mobil Baru Manual*:", key="m_da_manual")
+            if sel_da == "-- Ketik Manual / DA Baru --":
+                manual_da = st.text_input("Ketik DA / No Mobil Baru Manual*:", placeholder="Contoh: 0301M04", key="m_da_manual")
 
             to_be_nama = st.text_input("Nama User / DA / ASP Baru*:", key="m_nama_new")
             
@@ -100,7 +100,7 @@ def render_tab9(df_asset):
         if btn_submit:
             # PENENTUAN VALUE KD SITE & DA
             final_kd_site = manual_kd_site if sel_kd_site == "-- Ketik Manual --" else sel_kd_site
-            final_da = manual_da if sel_da == "-- Ketik Manual --" else sel_da
+            final_da = manual_da if sel_da == "-- Ketik Manual / DA Baru --" else sel_da
 
             # VALIDASI WAJIB ISI
             if selected_sn == "-- Pilih SN --":
@@ -120,7 +120,7 @@ def render_tab9(df_asset):
             elif catatan_tambahan.strip() == "":
                 st.error("❌ **Gagal Process!** Catatan Tambahan / Detail Mutasi wajib diisi.")
             else:
-                # CONVERT TO UPPERCASE & PEMETAAN NAMA SITE
+                # CONVERT TO UPPERCASE & PEMETAAN NAMA SITE RESMI
                 kd_site_cap = final_kd_site.strip().upper()
                 site_name_auto = SITE_MAP.get(kd_site_cap, f"DP {kd_site_cap}")
                 
@@ -138,7 +138,7 @@ def render_tab9(df_asset):
                 if not idx_target.empty:
                     target_sn = sn_pengganti if ket_mutasi == "TUKAR TABLET" else selected_sn
                     
-                    # UPDATE DATA DI DATABASE DENGAN NAMA KOLOM "DA/No Mobil"
+                    # UPDATE HINGGA KE DATABASE KEDUA KOLOM (DA/No Mobil & Site)
                     df_curr.loc[idx_target, "User"] = nama_cap
                     df_curr.loc[idx_target, "Kd Site"] = kd_site_cap
                     df_curr.loc[idx_target, "Site"] = site_name_auto
