@@ -41,11 +41,34 @@ st.set_page_config(page_title="IT Asset Management System", page_icon="💻", la
 # Muat Data Utama
 df_asset = load_data()
 
-# Inisialisasi Session State Login
+# Inisialisasi Session State Login & Dialog PIN
 if "admin_logged_in" not in st.session_state:
     st.session_state["admin_logged_in"] = False
 
 current_pin = get_admin_pin()
+
+# DIALOG / MODAL POP-UP UNTUK UBAH PASSWORD ADMIN
+@st.dialog("🔑 Ubah Password / PIN Admin")
+def show_change_pin_dialog():
+    st.write("Silakan masukkan PIN lama dan PIN baru Anda di bawah ini:")
+    with st.form("form_modal_change_pin", clear_on_submit=True):
+        old_pin = st.text_input("PIN Lama*:", type="password")
+        new_pin = st.text_input("PIN Baru*:", type="password")
+        confirm_pin = st.text_input("Konfirmasi PIN Baru*:", type="password")
+        
+        btn_submit_pin = st.form_submit_button("💾 Simpan PIN Baru", type="primary")
+        
+        if btn_submit_pin:
+            if old_pin != current_pin:
+                st.error("❌ PIN Lama Salah!")
+            elif new_pin.strip() == "":
+                st.error("❌ PIN Baru Tidak Boleh Kosong!")
+            elif new_pin != confirm_pin:
+                st.error("❌ Konfirmasi PIN Baru Tidak Cocok!")
+            else:
+                save_admin_pin(new_pin)
+                st.success("🎉 PIN Admin Berhasil Diperbarui!")
+                st.rerun()
 
 # --- SIDEBAR ACCESS CONTROL ---
 st.sidebar.title("🔐 Login Administrator")
@@ -64,35 +87,16 @@ if not st.session_state["admin_logged_in"]:
 else:
     st.sidebar.success("✅ Terverifikasi sebagai Admin / IT EDP")
     
-    # TOMBOL KELUAR MODE ADMIN
-    if st.sidebar.button("🔒 Keluar Mode Admin"):
+    # 1. TOMBOL KELUAR MODE ADMIN
+    if st.sidebar.button("🔒 Keluar Mode Admin", key="btn_logout"):
         st.session_state["admin_logged_in"] = False
         st.rerun()
 
-    st.sidebar.markdown("---")
-    
-    # MENU UBAH PIN ADMIN DITAMPILKAN SECARA EKSPLISIT
-    st.sidebar.subheader("⚙️ Pengaturan Akses")
-    with st.sidebar.expander("🔑 Ubah PIN Admin", expanded=False):
-        with st.form("form_change_pin", clear_on_submit=True):
-            old_pin = st.text_input("PIN Lama*:", type="password")
-            new_pin = st.text_input("PIN Baru*:", type="password")
-            confirm_pin = st.text_input("Konfirmasi PIN Baru*:", type="password")
-            
-            btn_change_pin = st.form_submit_button("💾 Simpan PIN Baru")
-            
-            if btn_change_pin:
-                if old_pin != current_pin:
-                    st.error("❌ PIN Lama Salah!")
-                elif new_pin.strip() == "":
-                    st.error("❌ PIN Baru Tidak Boleh Kosong!")
-                elif new_pin != confirm_pin:
-                    st.error("❌ Konfirmasi PIN Baru Tidak Cocok!")
-                else:
-                    save_admin_pin(new_pin)
-                    st.success("🎉 PIN Admin Berhasil Diperbarui!")
+    # 2. TOMBOL UBAH PASSWORD TEPAT DI BAWAH TOMBOL KELUAR
+    if st.sidebar.button("🔑 Ubah Password Admin", key="btn_open_change_pin_modal"):
+        show_change_pin_dialog()
 
-    st.sidebar.markdown("---")
+st.sidebar.markdown("---")
 
 # --- TAMPILAN SESUAI HAK AKSES ---
 if not st.session_state["admin_logged_in"]:
