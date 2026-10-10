@@ -1,5 +1,7 @@
 import streamlit as st
-from database import load_data
+import json
+import os
+from database import load_data, commit_to_github
 from ai_assistant import render_ai_assistant
 
 # Import Modul Per-Tab
@@ -13,18 +15,37 @@ from modules.tab7_logs import render_tab7
 from modules.tab8_plotting import render_tab8
 from modules.tab9_mutasi import render_tab9
 
+CONFIG_FILE = "admin_config.json"
+DEFAULT_PIN = "1234"
+
+def get_admin_pin():
+    """Membaca PIN Admin dari file konfigurasi"""
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                data = json.load(f)
+                return data.get("admin_pin", DEFAULT_PIN)
+        except Exception:
+            return DEFAULT_PIN
+    return DEFAULT_PIN
+
+def save_admin_pin(new_pin):
+    """Menyimpan PIN Admin baru ke file konfigurasi & sync ke GitHub"""
+    with open(CONFIG_FILE, "w") as f:
+        json.dump({"admin_pin": new_pin}, f)
+    commit_to_github(CONFIG_FILE, "Update Admin PIN")
+
 # Konfigurasi Halaman Web
 st.set_page_config(page_title="IT Asset Management System", page_icon="💻", layout="wide")
 
 # Muat Data Utama
 df_asset = load_data()
 
-# PIN RAHASIA ADMIN (Silakan ubah '1234' sesuai keinginan Anda)
-ADMIN_PIN = "1234"
-
-# Inisialisasi Session State Login Admin
+# Inisialisasi Session State Login
 if "admin_logged_in" not in st.session_state:
     st.session_state["admin_logged_in"] = False
+
+current_pin = get_admin_pin()
 
 # --- SIDEBAR ACCESS CONTROL ---
 st.sidebar.title("🔐 Login Administrator")
@@ -34,7 +55,7 @@ if not st.session_state["admin_logged_in"]:
     pin_input = st.sidebar.text_input("Masukkan PIN Admin / EDP:", type="password", key="login_pin_input")
     
     if st.sidebar.button("🔓 Login Admin"):
-        if pin_input == ADMIN_PIN:
+        if pin_input == current_pin:
             st.session_state["admin_logged_in"] = True
             st.sidebar.success("🔑 Login Berhasil!")
             st.rerun()
@@ -42,9 +63,33 @@ if not st.session_state["admin_logged_in"]:
             st.sidebar.error("❌ PIN Salah!")
 else:
     st.sidebar.success("✅ Terverifikasi sebagai Admin / IT EDP")
+    
+    # KELUAR MODE ADMIN
     if st.sidebar.button("🔒 Keluar Mode Admin"):
         st.session_state["admin_logged_in"] = False
         st.rerun()
+
+    st.sidebar.markdown("---")
+    
+    # FORM UBAH PASSWORD ADMIN (EXPANDER)
+    with st.sidebar.expander("🔑 Ubah Password Admin"):
+        with st.form("form_change_pin", clear_on_submit=True):
+            old_pin = st.text_input("PIN Lama*:", type="password")
+            new_pin = st.text_input("PIN Baru*:", type="password")
+            confirm_pin = st.text_input("Konfirmasi PIN Baru*:", type="password")
+            
+            btn_change_pin = st.form_submit_button("💾 Simpan PIN Baru")
+            
+            if btn_change_pin:
+                if old_pin != current_pin:
+                    st.error("❌ PIN Lama Salah!")
+                elif new_pin.strip() == "":
+                    st.error("❌ PIN Baru Tidak Boleh Kosong!")
+                elif new_pin != confirm_pin:
+                    st.error("❌ Konfirmasi PIN Baru Tidak Cocok!")
+                else:
+                    save_admin_pin(new_pin)
+                    st.success("🎉 PIN Admin Berhasil Diperbarui!")
 
 st.sidebar.markdown("---")
 
