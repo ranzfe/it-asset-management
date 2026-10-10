@@ -134,7 +134,7 @@ with tab1:
             excel_data = output.getvalue()
             st.download_button("📊 Export Excel (.xlsx)", excel_data, "export_it_asset.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-# TAB 2: SERAH TERIMA HARDWARE (BAST PRINTABLE DENGAN CUSTOM LOGO)
+# TAB 2: SERAH TERIMA HARDWARE (UKURAN PRESISI A4)
 with tab2:
     st.subheader("📄 Form Tanda Terima Hardware")
     st.caption("Pilih aset, upload logo, isi data penyerahan, cetak dokumen, dan update database otomatis.")
@@ -151,7 +151,7 @@ with tab2:
         if logo_file is not None:
             base64_logo = base64.b64encode(logo_file.read()).decode()
             mime_type = logo_file.type
-            logo_html_tag = f'<img src="data:{mime_type};base64,{base64_logo}" style="max-height: 55px; max-width: 180px; object-fit: contain;" />'
+            logo_html_tag = f'<img src="data:{mime_type};base64,{base64_logo}" style="max-height: 50px; max-width: 160px; object-fit: contain;" />'
 
         st.markdown("---")
         st.markdown("##### 📝 Input Data Serah Terima")
@@ -171,7 +171,7 @@ with tab2:
         tgl_st = st.date_input("Tanggal:", datetime.now())
         
         st.markdown("---")
-        telah_diterima = st.text_input("Telah Diterima Dari:", value="FEBRIKA PUJIASMORO")
+        telah_diterima = st.text_input("Telah Diterima Dari:", value="FEBRIKA PUJIASMORO - EDP")
         nama_user_st = st.text_input("Nama User Penerima:", value=auto_user)
         jabatan_st = st.text_input("Jabatan / Lokasi Site:", value=auto_site)
         
@@ -196,7 +196,7 @@ with tab2:
         
         st.markdown("---")
         penerima_st = st.text_input("Yang Menerima:", value=nama_user_st)
-        pemeriksa_st = st.text_input("Yang Memeriksa:", value="IT SUPPORT")
+        pemeriksa_st = st.text_input("Yang Memeriksa:", value="KURIR")
         penyerah_st = st.text_input("Yang Menyerahkan:", value=telah_diterima)
         lokasi_cetak = st.text_input("Kota Cetak:", value="BEKASI")
 
@@ -222,128 +222,163 @@ with tab2:
         sn_list_html = "<br>".join(selected_sns) if selected_sns else "SN-XXXXXX"
         tgl_str = tgl_st.strftime("%d %B %Y").upper()
         
+        # HTML & CSS DENGAN UKURAN PRESISI A4
         html_doc = f"""
-        <div id="print-area" style="background-color: white; color: black; padding: 25px; border: 2px solid #333; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.4;">
-            <table style="width: 100%; border-collapse: collapse; border: none;">
-                <tr>
-                    <td style="width: 55%; vertical-align: top;">
-                        <table style="border: none; font-size: 13px;">
-                            <tr><td style="width: 80px;">No</td><td>: {no_bast}</td></tr>
-                            <tr><td>PO. No</td><td>: {po_no}</td></tr>
-                            <tr><td>Tanggal</td><td>: {tgl_str}</td></tr>
-                        </table>
-                    </td>
-                    <td style="width: 45%; text-align: right; vertical-align: top;">
-                        {logo_html_tag}
-                    </td>
-                </tr>
-            </table>
-
-            <div style="text-align: center; margin: 15px 0; font-size: 18px; font-weight: bold; text-decoration: underline;">
-                TANDA TERIMA HARDWARE
-            </div>
-
-            <table style="width: 100%; margin-bottom: 15px; font-size: 13px; border: none;">
-                <tr><td style="width: 130px;">Telah diterima dari</td><td>: {telah_diterima}</td></tr>
-                <tr><td>Nama user</td><td>: {nama_user_st}</td></tr>
-                <tr><td>Jabatan</td><td>: {jabatan_st}</td></tr>
-            </table>
-
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid black; text-align: center; font-size: 12px; margin-bottom: 10px;">
-                <thead>
-                    <tr style="background-color: #f2f2f2;">
-                        <th style="border: 1px solid black; padding: 6px; width: 8%;">No</th>
-                        <th style="border: 1px solid black; padding: 6px; width: 35%;">Jenis Barang</th>
-                        <th style="border: 1px solid black; padding: 6px; width: 25%;">Merk / Tipe</th>
-                        <th style="border: 1px solid black; padding: 6px; width: 24%;">SN & HW ID</th>
-                        <th style="border: 1px solid black; padding: 6px; width: 8%;">Qty</th>
-                    </tr>
-                </thead>
-                <tbody>
+        <div style="display: flex; flex-direction: column; align-items: center; background: #525659; padding: 10px;">
+            <div id="print-area" style="
+                width: 190mm; 
+                min-height: 260mm; 
+                background-color: white; 
+                color: black; 
+                padding: 15mm 12mm; 
+                box-sizing: border-box; 
+                font-family: Arial, Helvetica, sans-serif; 
+                font-size: 11px; 
+                line-height: 1.3;
+                box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            ">
+                <table style="width: 100%; border-collapse: collapse; border: none; margin-bottom: 10px;">
                     <tr>
-                        <td style="border: 1px solid black; padding: 12px; vertical-align: top;">1.</td>
-                        <td style="border: 1px solid black; padding: 12px; vertical-align: top;">{jenis_barang_st}</td>
-                        <td style="border: 1px solid black; padding: 12px; vertical-align: top;">{merk_tipe_st}</td>
-                        <td style="border: 1px solid black; padding: 12px; vertical-align: top; font-weight: bold;">{sn_list_html}</td>
-                        <td style="border: 1px solid black; padding: 12px; vertical-align: top;">{qty_st}</td>
+                        <td style="width: 60%; vertical-align: top;">
+                            <table style="border: none; font-size: 11px;">
+                                <tr><td style="width: 70px;">No</td><td>: {no_bast}</td></tr>
+                                <tr><td>PO. No</td><td>: {po_no}</td></tr>
+                                <tr><td>Tanggal</td><td>: {tgl_str}</td></tr>
+                            </table>
+                        </td>
+                        <td style="width: 40%; text-align: right; vertical-align: top;">
+                            {logo_html_tag}
+                        </td>
                     </tr>
-                </tbody>
-            </table>
-            
-            <div style="font-size: 10px; font-style: italic; margin-bottom: 10px;">
-                Item: PC / Notebook / Monitor / UPS / Printer / Tape Drive / LCD Projector / Scanner / Hub / Switch / Print Server / Modem
+                </table>
+
+                <div style="text-align: center; margin: 10px 0 15px 0; font-size: 16px; font-weight: bold; text-decoration: underline;">
+                    TANDA TERIMA HARDWARE
+                </div>
+
+                <table style="width: 100%; margin-bottom: 12px; font-size: 11px; border: none;">
+                    <tr><td style="width: 120px;">Telah diterima dari</td><td>: {telah_diterima}</td></tr>
+                    <tr><td>Nama user</td><td>: {nama_user_st}</td></tr>
+                    <tr><td>Jabatan</td><td>: {jabatan_st}</td></tr>
+                </table>
+
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid black; text-align: center; font-size: 11px; margin-bottom: 6px;">
+                    <thead>
+                        <tr style="background-color: #f2f2f2; font-weight: bold;">
+                            <th style="border: 1px solid black; padding: 5px; width: 6%;">No</th>
+                            <th style="border: 1px solid black; padding: 5px; width: 34%;">Jenis Barang</th>
+                            <th style="border: 1px solid black; padding: 5px; width: 25%;">Merk / Tipe</th>
+                            <th style="border: 1px solid black; padding: 5px; width: 27%;">SN & HW ID</th>
+                            <th style="border: 1px solid black; padding: 5px; width: 8%;">Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="border: 1px solid black; padding: 8px; vertical-align: top;">1.</td>
+                            <td style="border: 1px solid black; padding: 8px; vertical-align: top;">{jenis_barang_st}</td>
+                            <td style="border: 1px solid black; padding: 8px; vertical-align: top;">{merk_tipe_st}</td>
+                            <td style="border: 1px solid black; padding: 8px; vertical-align: top; font-weight: bold;">{sn_list_html}</td>
+                            <td style="border: 1px solid black; padding: 8px; vertical-align: top;">{qty_st}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div style="font-size: 9px; font-style: italic; margin-bottom: 10px; color: #333;">
+                    Item: PC / Notebook / Monitor / UPS / Printer / Tape Drive / LCD Projector / Scanner / Hub / Switch / Print Server / Modem
+                </div>
+
+                <div style="font-weight: bold; font-size: 11px; text-decoration: underline; margin-bottom: 4px;">Data Pelengkap :</div>
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid black; font-size: 10px; margin-bottom: 12px;">
+                    <tr style="background-color: #f2f2f2; font-weight: bold; text-align: center;">
+                        <td style="border: 1px solid black; padding: 3px; width: 28%;">Spesifikasi / merk / tipe / size / driver</td>
+                        <td style="border: 1px solid black; padding: 3px; width: 24%;">PC / Notebook</td>
+                        <td style="border: 1px solid black; padding: 3px; width: 24%;">Notebook / Tablet</td>
+                        <td style="border: 1px solid black; padding: 3px; width: 24%;">Lain-lain</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid black; padding: 5px; vertical-align: top; line-height: 1.4;">
+                            -Proc speed<br>-HDD size<br>-Mem size<br>-Password<br>-NIC driver<br>-CD driver<br>-Modem driver
+                        </td>
+                        <td style="border: 1px solid black; padding: 5px; vertical-align: top; line-height: 1.4;">
+                            -NIC [{ '✔' if chk_mouse else ' ' }]<br>
+                            -CD/DVD [ ]<br>
+                            -Keyboard [{ '✔' if chk_keyboard else ' ' }]<br>
+                            -Mouse [{ '✔' if chk_mouse else ' ' }]<br>
+                            -Kabel power [{ '✔' if chk_kabel else ' ' }]
+                        </td>
+                        <td style="border: 1px solid black; padding: 5px; vertical-align: top; line-height: 1.4;">
+                            -Baterai [{ '✔' if chk_baterai else ' ' }]<br>
+                            -Charger [{ '✔' if chk_charger else ' ' }]<br>
+                            -LCD Display [✔]<br>
+                            -Tas notebook [{ '✔' if chk_tas else ' ' }]
+                        </td>
+                        <td style="border: 1px solid black; padding: 5px; vertical-align: top; line-height: 1.4;">
+                            Printer:<br>
+                            -Kabel power [{ '✔' if chk_kabel else ' ' }]<br>
+                            -Kabel USB [{ '✔' if chk_kabel else ' ' }]
+                        </td>
+                    </tr>
+                </table>
+
+                <div style="font-size: 11px; margin-bottom: 25px;">
+                    <b>Catatan :</b> <i>{catatan_st}</i>
+                </div>
+
+                <table style="width: 100%; border: none; text-align: center; font-size: 11px; margin-top: 15px;">
+                    <tr>
+                        <td style="width: 33%;">Yang menerima</td>
+                        <td style="width: 33%;">Yang memeriksa</td>
+                        <td style="width: 33%;">{lokasi_cetak}, {tgl_str}<br>Yang menyerahkan</td>
+                    </tr>
+                    <tr style="height: 50px;"><td></td><td></td><td></td></tr>
+                    <tr>
+                        <td><b>( {penerima_st} )</b></td>
+                        <td><b>( {pemeriksa_st} )</b></td>
+                        <td><b>( {penyerah_st} )</b></td>
+                    </tr>
+                </table>
             </div>
-
-            <div style="font-weight: bold; font-size: 12px; text-decoration: underline; margin-bottom: 5px;">Data Pelengkap :</div>
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid black; font-size: 11px; margin-bottom: 10px;">
-                <tr style="background-color: #f2f2f2; font-weight: bold; text-align: center;">
-                    <td style="border: 1px solid black; padding: 4px; width: 30%;">Spesifikasi / merk / tipe / size / driver</td>
-                    <td style="border: 1px solid black; padding: 4px; width: 23%;">PC / Notebook</td>
-                    <td style="border: 1px solid black; padding: 4px; width: 23%;">Notebook / Tablet</td>
-                    <td style="border: 1px solid black; padding: 4px; width: 24%;">Lain-lain</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 6px; vertical-align: top;">
-                        -Proc speed<br>-HDD size<br>-Mem size<br>-Password<br>-NIC driver<br>-CD driver<br>-Modem driver
-                    </td>
-                    <td style="border: 1px solid black; padding: 6px; vertical-align: top;">
-                        -NIC [{ '✔' if chk_mouse else ' ' }]<br>
-                        -Keyboard [{ '✔' if chk_keyboard else ' ' }]<br>
-                        -Mouse [{ '✔' if chk_mouse else ' ' }]<br>
-                        -Kabel power [{ '✔' if chk_kabel else ' ' }]
-                    </td>
-                    <td style="border: 1px solid black; padding: 6px; vertical-align: top;">
-                        -Baterai [{ '✔' if chk_baterai else ' ' }]<br>
-                        -Charger [{ '✔' if chk_charger else ' ' }]<br>
-                        -LCD Display [✔]<br>
-                        -Tas notebook [{ '✔' if chk_tas else ' ' }]
-                    </td>
-                    <td style="border: 1px solid black; padding: 6px; vertical-align: top;">
-                        Printer:<br>
-                        -Kabel power [{ '✔' if chk_kabel else ' ' }]<br>
-                        -Kabel USB [{ '✔' if chk_kabel else ' ' }]
-                    </td>
-                </tr>
-            </table>
-
-            <div style="font-size: 12px; margin-bottom: 25px;">
-                <b>Catatan :</b> <i>{catatan_st}</i>
-            </div>
-
-            <table style="width: 100%; border: none; text-align: center; font-size: 12px; margin-top: 30px;">
-                <tr>
-                    <td style="width: 33%;">Yang menerima</td>
-                    <td style="width: 33%;">Yang memeriksa</td>
-                    <td style="width: 33%;">{lokasi_cetak}, {tgl_str}<br>Yang menyerahkan</td>
-                </tr>
-                <tr style="height: 60px;"><td></td><td></td><td></td></tr>
-                <tr>
-                    <td><b>( {penerima_st} )</b></td>
-                    <td><b>( {pemeriksa_st} )</b></td>
-                    <td><b>( {penyerah_st} )</b></td>
-                </tr>
-            </table>
-        </div>
-        """
-        
-        st.components.v1.html(
-            f"""
-            {html_doc}
             <br>
-            <button onclick="window.print()" style="background-color: #008CBA; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">
+            <button onclick="window.print()" style="background-color: #008CBA; color: white; padding: 10px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
                 🖨️ Cetak / Simpan PDF Dokumen Ini
             </button>
-            <style>
-                @media print {{
-                    body * {{ visibility: hidden; }}
-                    #print-area, #print-area * {{ visibility: visible; }}
-                    #print-area {{ position: absolute; left: 0; top: 0; width: 100%; border: none !important; }}
+        </div>
+
+        <style>
+            @media print {{
+                @page {{
+                    size: A4 portrait;
+                    margin: 0;
                 }}
-            </style>
-            """,
-            height=700,
-            scrolling=True
-        )
+                body {{
+                    background: white !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }}
+                body * {{
+                    visibility: hidden;
+                }}
+                #print-area, #print-area * {{
+                    visibility: visible;
+                }}
+                #print-area {{
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    width: 210mm !important;
+                    min-height: 297mm !important;
+                    padding: 15mm !important;
+                    box-shadow: none !important;
+                    border: none !important;
+                }}
+                button {{
+                    display: none !important;
+                }}
+            }}
+        </style>
+        """
+        
+        st.components.v1.html(html_doc, height=800, scrolling=True)
 
 # TAB 3: ANALYTICS & GRAFIK
 with tab3:
