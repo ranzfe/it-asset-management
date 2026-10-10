@@ -19,19 +19,34 @@ st.set_page_config(page_title="IT Asset Management System", page_icon="💻", la
 # Muat Data Utama
 df_asset = load_data()
 
-# --- SIDEBAR ACCESS CONTROL / LOGIN ROLE ---
-st.sidebar.title("🔐 Mode Akses Pengguna")
-user_role = st.sidebar.selectbox("Pilih Hak Akses Anda:", ["Admin / IT EDP", "PIC / User Field (Hanya Mutasi)"])
+# PIN RAHASIA ADMIN (Silakan ubah '1234' sesuai keinginan Anda)
+ADMIN_PIN = "1234"
 
-if user_role == "PIC / User Field (Hanya Mutasi)":
-    st.sidebar.info("💡 Mode PIC: Anda hanya diizinkan melakukan pengisian Form Mutasi Aset.")
-    st.title("💻 IT Asset Management - Form Mutasi")
+# --- SIDEBAR ACCESS CONTROL ---
+st.sidebar.title("🔐 Akses System")
+user_role = st.sidebar.radio("Pilih Hak Akses:", ["PIC / User Field (Hanya Mutasi)", "Admin / IT EDP"])
+
+is_admin = False
+
+if user_role == "Admin / IT EDP":
+    pin_input = st.sidebar.text_input("Masukkan PIN Admin / EDP:", type="password")
+    if pin_input == ADMIN_PIN:
+        is_admin = True
+        st.sidebar.success("🔑 Akses Admin Terverifikasi!")
+    else:
+        if pin_input != "":
+            st.sidebar.error("❌ PIN Salah!")
+        st.sidebar.warning("🔒 Masukkan PIN yang benar untuk mengakses menu Admin.")
+
+if not is_admin:
+    # --- TAMPILAN DEFALUT UNTUK PIC / USER FIELD (HANYA FORM MUTASI) ---
+    st.title("💻 IT Asset Management System - Form Mutasi")
+    st.info("💡 Mode PIC: Anda hanya diizinkan mengakses Form Mutasi Aset.")
     st.markdown("---")
-    # Tampilkan khusus Form Mutasi untuk PIC
     render_tab9(df_asset)
 
 else:
-    # --- MODE ADMIN / IT EDP (AKSES PENUH KE SEMUA TAB) ---
+    # --- TAMPILAN FULL UNTUK ADMIN / IT EDP ---
     st.title("💻 IT Asset Management System")
     st.markdown("---")
 
